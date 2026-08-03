@@ -9,7 +9,7 @@
         body {
             margin: 0;
             min-height: 100vh;
-            background: #0e1e2b;
+            background: #0a1a2a;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -17,19 +17,19 @@
             padding: 16px;
         }
         .container {
-            background: #1f4055;
+            background: #1a3a4a;
             padding: 18px 22px 22px;
             border-radius: 40px;
-            border: 1px solid #3d7a94;
+            border: 1px solid #3a7a94;
             box-shadow: 0 20px 30px rgba(0,0,0,0.7);
-            max-width: 860px;
+            max-width: 880px;
             width: 100%;
         }
         canvas {
             display: block;
-            background: #1f3f4f;
+            background: #1a3a4a;
             border-radius: 24px;
-            box-shadow: inset 0 0 0 2px #4d8ba8;
+            box-shadow: inset 0 0 0 2px #4a8ba8;
             width: 100%;
             height: auto;
             aspect-ratio: 800/600;
@@ -45,10 +45,10 @@
             gap: 8px;
         }
         .status {
-            background: #102b38;
+            background: #0a2a38;
             padding: 4px 16px;
             border-radius: 40px;
-            border: 1px solid #2f6279;
+            border: 1px solid #2a6279;
             font-size: 0.8rem;
             font-weight: 600;
         }
@@ -71,22 +71,22 @@
         .btn-join:hover { background: #5f9ab8; }
         .btn-danger { background: #c74e3c; border: 1px solid #e6836e; }
         .btn-danger:hover { background: #d85e4c; }
-        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .input-group {
             display: flex;
             gap: 6px;
             align-items: center;
-            background: #0e2a38;
+            background: #0a2a38;
             padding: 2px 8px 2px 14px;
             border-radius: 40px;
-            border: 1px solid #2f6279;
+            border: 1px solid #2a6279;
         }
         .input-group input {
             background: transparent;
             border: none;
             color: #d4edff;
             padding: 4px 0;
-            width: 110px;
+            width: 120px;
             font-size: 0.85rem;
             outline: none;
         }
@@ -94,10 +94,10 @@
         .stats {
             display: flex;
             gap: 14px;
-            background: #102b38;
+            background: #0a2a38;
             padding: 4px 16px;
             border-radius: 60px;
-            border: 1px solid #2f6279;
+            border: 1px solid #2a6279;
             font-size: 0.8rem;
         }
         .stats span { color: #b3def5; }
@@ -112,10 +112,10 @@
             justify-content: center;
         }
         .hint span {
-            background: #13303f;
+            background: #0a2a38;
             padding: 2px 10px;
             border-radius: 30px;
-            border: 1px solid #2b6279;
+            border: 1px solid #2a6279;
         }
         .hint .p1 { color: #f2c94c; }
         .hint .p2 { color: #eb5757; }
@@ -138,7 +138,7 @@
     <div class="panel">
         <div class="status offline" id="statusDisplay">⚪ 未连接</div>
         <div class="input-group">
-            <input type="text" id="hostInput" placeholder="主机IP" value="127.0.0.1">
+            <input type="text" id="hostInput" placeholder="主机ID" value="">
             <button class="btn btn-join" id="joinBtn">📥 加入</button>
             <button class="btn btn-host" id="hostBtn">🚀 创建房间</button>
             <button class="btn btn-danger" id="disconnectBtn">⛔ 断开</button>
@@ -149,10 +149,8 @@
         </div>
     </div>
     <div class="hint">
-        <span class="p1">🟡 P1: WASD + 空格</span>
-        <span class="p2">🔴 P2: 方向键 + Shift</span>
-        <span class="p3">🔵 P3: IJKL + U</span>
-        <span class="p4">🟢 P4: TFGH + R</span>
+        <span class="p1">🟡 你: WASD + 空格/左键</span>
+        <span>🔴 其他玩家: 自动同步</span>
         <span>🧱 掩体可破坏</span>
         <span>❤️ 每人3条命</span>
     </div>
@@ -160,10 +158,9 @@
 
 <script>
     // ============================================================
-    //  🌐 局域网联机枪战 (WebRTC + 手动信令)
-    //  使用 BroadcastChannel 或 手动IP交换
-    //  实际局域网中，使用 WebRTC 需要信令服务器
-    //  这里我们使用 手动信令 + 直接连接
+    //  🌐 局域网联机枪战 - 完整版
+    //  使用 WebRTC + 手动信令交换
+    //  主机创建房间，获得ID，其他人通过ID加入
     // ============================================================
 
     const canvas = document.getElementById('gameCanvas');
@@ -181,10 +178,15 @@
     let winnerId = null;
     let myId = null;
     let isHost = false;
-    let peerConnections = {};  // { peerId: RTCPeerConnection }
-    let dataChannels = {};     // { peerId: RTCDataChannel }
-    let localId = null;
-    let playerIdCounter = 0;
+    let isConnected = false;
+
+    // WebRTC 连接
+    let peerConnections = {};
+    let dataChannels = {};
+    let pendingCandidates = {};
+
+    // 信令 (通过复制粘贴交换)
+    let signalData = null;
 
     // ----- 玩家配置 -----
     const COLORS = ['#f2c94c', '#eb5757', '#2f9bff', '#6fcf97', '#bb6bd9', '#f2994a', '#27ae60', '#e74c3c'];
@@ -192,16 +194,12 @@
     const SPAWNS = [
         { x: 150, y: 150 }, { x: 650, y: 150 },
         { x: 150, y: 450 }, { x: 650, y: 450 },
-        { x: 400, y: 80 }, { x: 400, y: 520 },
-        { x: 80, y: 300 }, { x: 720, y: 300 }
+        { x: 400, y: 80 }, { x: 400, y: 520 }
     ];
 
     // 按键映射
     const KEYMAP = [
         { up: 'w', down: 's', left: 'a', right: 'd', fire: ' ' },
-        { up: 'arrowup', down: 'arrowdown', left: 'arrowleft', right: 'arrowright', fire: 'shift' },
-        { up: 'i', down: 'k', left: 'j', right: 'l', fire: 'u' },
-        { up: 't', down: 'g', left: 'f', right: 'h', fire: 'r' }
     ];
 
     // 键盘状态
@@ -209,23 +207,22 @@
     let mouseX = 400, mouseY = 300;
     let mousePressed = false;
 
-    // ----- 信令通道 (BroadcastChannel 用于局域网发现) -----
-    let signalChannel = null;
-    let isConnected = false;
+    // ----- 工具函数 -----
+    function genId() {
+        return 'p' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+    }
 
-    // ----- 创建障碍物 -----
     function createObstacles() {
         return [
-            { x: 350, y: 200, w: 80, h: 30, hp: 3, maxHp: 3, alive: true },
-            { x: 400, y: 350, w: 80, h: 30, hp: 3, maxHp: 3, alive: true },
-            { x: 200, y: 420, w: 30, h: 80, hp: 3, maxHp: 3, alive: true },
-            { x: 580, y: 120, w: 30, h: 80, hp: 3, maxHp: 3, alive: true },
-            { x: 120, y: 260, w: 30, h: 80, hp: 3, maxHp: 3, alive: true },
-            { x: 650, y: 400, w: 30, h: 80, hp: 3, maxHp: 3, alive: true },
+            { id: 'o1', x: 350, y: 200, w: 80, h: 30, hp: 3, maxHp: 3, alive: true },
+            { id: 'o2', x: 400, y: 350, w: 80, h: 30, hp: 3, maxHp: 3, alive: true },
+            { id: 'o3', x: 200, y: 420, w: 30, h: 80, hp: 3, maxHp: 3, alive: true },
+            { id: 'o4', x: 580, y: 120, w: 30, h: 80, hp: 3, maxHp: 3, alive: true },
+            { id: 'o5', x: 120, y: 260, w: 30, h: 80, hp: 3, maxHp: 3, alive: true },
+            { id: 'o6', x: 650, y: 400, w: 30, h: 80, hp: 3, maxHp: 3, alive: true },
         ];
     }
 
-    // ----- 创建玩家 -----
     function createPlayer(id, x, y, name, color) {
         return {
             id: id,
@@ -235,27 +232,32 @@
             hp: 3,
             maxHp: 3,
             alive: true,
-            color: color || COLORS[id % COLORS.length],
-            name: name || NAMES[id % NAMES.length] || `玩家${id}`,
+            color: color || COLORS[Object.keys(players).length % COLORS.length],
+            name: name || NAMES[Object.keys(players).length % NAMES.length] || `玩家${id}`,
             angle: 0,
-            shootCooldown: 0,
-            keys: KEYMAP[id % KEYMAP.length]
+            shootCooldown: 0
         };
     }
 
-    // ----- 生成唯一ID -----
-    function genId() {
-        return 'p' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
+    function rectCircleCollide(rect, circle) {
+        const nearX = Math.max(rect.x, Math.min(circle.x, rect.x + rect.w));
+        const nearY = Math.max(rect.y, Math.min(circle.y, rect.y + rect.h));
+        const dx = circle.x - nearX;
+        const dy = circle.y - nearY;
+        return (dx * dx + dy * dy) < (circle.radius * circle.radius);
     }
 
-    // ----- 初始化游戏 (本地) -----
+    // ============================================================
+    //  游戏逻辑
+    // ============================================================
+
     function initLocalGame() {
         const id = genId();
-        localId = id;
+        myId = id;
         const spawn = SPAWNS[0];
         localPlayer = createPlayer(id, spawn.x, spawn.y, '我', COLORS[0]);
+        players = {};
         players[id] = localPlayer;
-        myId = id;
         obstacles = createObstacles();
         bullets = [];
         gameRunning = true;
@@ -263,398 +265,17 @@
         updateUI();
     }
 
-    // ============================================================
-    //  WebRTC 连接管理
-    // ============================================================
-
-    const STUN_SERVERS = {
-        iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' }
-        ]
-    };
-
-    // ----- 创建主机 (等待连接) -----
-    function createHost() {
-        if (isConnected) disconnect();
-
-        initLocalGame();
-        isHost = true;
-        isConnected = true;
-        statusDisplay.className = 'status online';
-        statusDisplay.textContent = '🟢 主机 (等待加入)';
-        updateUI();
-
-        // 监听广播频道 (局域网发现)
-        try {
-            signalChannel = new BroadcastChannel('gunfight_lan');
-            signalChannel.onmessage = (e) => {
-                const data = e.data;
-                if (data.type === 'discover' && isHost) {
-                    // 回复主机信息
-                    signalChannel.postMessage({
-                        type: 'host_announce',
-                        hostId: localId,
-                        playerCount: Object.keys(players).length
-                    });
-                }
-                if (data.type === 'join_request' && isHost) {
-                    // 收到加入请求，建立连接
-                    if (data.peerId && data.peerId !== localId) {
-                        handleJoinRequest(data.peerId);
-                    }
-                }
-            };
-            // 广播自己
-            signalChannel.postMessage({ type: 'discover' });
-        } catch (e) {
-            console.warn('BroadcastChannel 不可用，请手动输入IP', e);
-        }
-
-        // 显示本机IP提示
-        showLocalIP();
-    }
-
-    // ----- 显示本机IP -----
-    function showLocalIP() {
-        // 通过WebRTC获取本地IP (简化)
-        const pc = new RTCPeerConnection({ iceServers: [] });
-        pc.createDataChannel('ip');
-        pc.createOffer().then(offer => {
-            pc.setLocalDescription(offer);
-        }).catch(() => {});
-        pc.onicecandidate = (e) => {
-            if (e.candidate) {
-                const ip = e.candidate.candidate.match(/(\d+\.\d+\.\d+\.\d+)/);
-                if (ip) {
-                    document.getElementById('hostInput').value = ip[0];
-                    pc.close();
-                }
-            }
-        };
-        setTimeout(() => pc.close(), 3000);
-    }
-
-    // ----- 处理加入请求 (主机) -----
-    function handleJoinRequest(peerId) {
-        if (peerConnections[peerId]) return;
-
-        console.log('📞 处理加入请求:', peerId);
-        const pc = new RTCPeerConnection(STUN_SERVERS);
-        peerConnections[peerId] = pc;
-
-        pc.ondatachannel = (event) => {
-            const channel = event.channel;
-            dataChannels[peerId] = channel;
-            setupDataChannel(channel, peerId);
-        };
-
-        pc.createOffer().then(offer => {
-            return pc.setLocalDescription(offer);
-        }).then(() => {
-            // 通过广播频道发送offer
-            if (signalChannel) {
-                signalChannel.postMessage({
-                    type: 'offer',
-                    from: localId,
-                    to: peerId,
-                    sdp: pc.localDescription
-                });
-            }
-        });
-
-        pc.onicecandidate = (e) => {
-            if (e.candidate && signalChannel) {
-                signalChannel.postMessage({
-                    type: 'ice_candidate',
-                    from: localId,
-                    to: peerId,
-                    candidate: e.candidate
-                });
-            }
-        };
-    }
-
-    // ----- 加入主机 (客户端) -----
-    function joinHost(hostId) {
-        if (isConnected) disconnect();
-
-        initLocalGame();
-        isHost = false;
-        isConnected = true;
-        statusDisplay.className = 'status connecting';
-        statusDisplay.textContent = '🟡 连接中...';
-
-        // 设置广播频道
-        try {
-            signalChannel = new BroadcastChannel('gunfight_lan');
-            signalChannel.onmessage = (e) => {
-                const data = e.data;
-                if (data.type === 'offer' && data.to === localId) {
-                    handleOffer(data);
-                }
-                if (data.type === 'ice_candidate' && data.to === localId) {
-                    handleIceCandidate(data);
-                }
-            };
-
-            // 发送加入请求
-            signalChannel.postMessage({
-                type: 'join_request',
-                peerId: localId,
-                hostId: hostId
-            });
-
-            // 创建PeerConnection
-            const pc = new RTCPeerConnection(STUN_SERVERS);
-            const channel = pc.createDataChannel('game');
-            dataChannels[hostId] = channel;
-            peerConnections[hostId] = pc;
-            setupDataChannel(channel, hostId);
-
-            pc.onicecandidate = (e) => {
-                if (e.candidate && signalChannel) {
-                    signalChannel.postMessage({
-                        type: 'ice_candidate',
-                        from: localId,
-                        to: hostId,
-                        candidate: e.candidate
-                    });
-                }
-            };
-
-            // 等待offer
-
-        } catch (e) {
-            console.error('加入失败', e);
-            statusDisplay.className = 'status offline';
-            statusDisplay.textContent = '🔴 连接失败';
-            isConnected = false;
-        }
-    }
-
-    // ----- 处理Offer -----
-    function handleOffer(data) {
-        const pc = peerConnections[data.from];
-        if (!pc) return;
-        pc.setRemoteDescription(new RTCSessionDescription(data.sdp))
-            .then(() => pc.createAnswer())
-            .then(answer => pc.setLocalDescription(answer))
-            .then(() => {
-                if (signalChannel) {
-                    signalChannel.postMessage({
-                        type: 'answer',
-                        from: localId,
-                        to: data.from,
-                        sdp: pc.localDescription
-                    });
-                }
-            });
-    }
-
-    // ----- 处理Answer -----
-    function handleAnswer(data) {
-        const pc = peerConnections[data.from];
-        if (!pc) return;
-        pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
-    }
-
-    // ----- 处理ICE Candidate -----
-    function handleIceCandidate(data) {
-        const pc = peerConnections[data.from];
-        if (!pc) return;
-        pc.addIceCandidate(new RTCIceCandidate(data.candidate));
-    }
-
-    // ----- 设置DataChannel -----
-    function setupDataChannel(channel, peerId) {
-        channel.onopen = () => {
-            console.log('✅ 数据通道已打开:', peerId);
-            statusDisplay.className = 'status online';
-            statusDisplay.textContent = isHost ? '🟢 主机 (已连接)' : '🟢 已连接';
-            // 发送玩家信息
-            sendPlayerInfo(peerId);
-        };
-
-        channel.onmessage = (e) => {
-            try {
-                const data = JSON.parse(e.data);
-                handlePeerMessage(data, peerId);
-            } catch (err) {
-                console.warn('消息解析失败', err);
-            }
-        };
-
-        channel.onclose = () => {
-            console.log('❌ 数据通道关闭:', peerId);
-            delete dataChannels[peerId];
-            delete peerConnections[peerId];
-            // 移除玩家
-            for (let id in players) {
-                if (id.startsWith('p') && id !== localId && !dataChannels[id]) {
-                    delete players[id];
-                }
-            }
-            updateUI();
-            statusDisplay.className = 'status offline';
-            statusDisplay.textContent = '🔴 断开连接';
-            isConnected = false;
-        };
-    }
-
-    // ----- 发送玩家信息 -----
-    function sendPlayerInfo(peerId) {
-        const channel = dataChannels[peerId];
-        if (!channel || channel.readyState !== 'open') return;
-        channel.send(JSON.stringify({
-            type: 'player_info',
-            player: {
-                id: localId,
-                x: localPlayer.x,
-                y: localPlayer.y,
-                color: localPlayer.color,
-                name: localPlayer.name,
-                hp: localPlayer.hp,
-                alive: localPlayer.alive
-            }
-        }));
-    }
-
-    // ============================================================
-    //  消息处理
-    // ============================================================
-
-    function handlePeerMessage(data, peerId) {
-        switch (data.type) {
-            case 'player_info':
-                // 添加或更新玩家
-                if (data.player && data.player.id !== localId) {
-                    if (!players[data.player.id]) {
-                        players[data.player.id] = createPlayer(
-                            data.player.id,
-                            data.player.x,
-                            data.player.y,
-                            data.player.name,
-                            data.player.color
-                        );
-                    }
-                    Object.assign(players[data.player.id], data.player);
-                    updateUI();
-                }
-                break;
-
-            case 'player_update':
-                if (data.player && data.player.id !== localId && players[data.player.id]) {
-                    Object.assign(players[data.player.id], data.player);
-                    updateUI();
-                }
-                break;
-
-            case 'bullet_spawn':
-                bullets.push(data.bullet);
-                break;
-
-            case 'bullet_remove':
-                bullets = bullets.filter(b => b.id !== data.bulletId);
-                break;
-
-            case 'player_hit':
-                if (players[data.targetId]) {
-                    players[data.targetId].hp = data.hp;
-                    if (data.hp <= 0) players[data.targetId].alive = false;
-                }
-                break;
-
-            case 'game_over':
-                gameRunning = false;
-                winnerId = data.winnerId;
-                break;
-
-            case 'obstacle_damage':
-                for (let ob of obstacles) {
-                    if (ob.id === data.obstacleId) {
-                        ob.hp = data.hp;
-                        if (ob.hp <= 0) ob.alive = false;
-                        break;
-                    }
-                }
-                break;
-
-            case 'sync_request':
-                // 发送完整状态
-                sendFullState(peerId);
-                break;
-
-            case 'full_state':
-                // 接收完整状态 (客户端)
-                if (!isHost) {
-                    players = data.players || {};
-                    bullets = data.bullets || [];
-                    obstacles = data.obstacles || [];
-                    gameRunning = data.gameRunning !== undefined ? data.gameRunning : true;
-                    winnerId = data.winnerId || null;
-                    // 保留自己的玩家
-                    if (localId && players[localId]) {
-                        localPlayer = players[localId];
-                    }
-                    updateUI();
-                }
-                break;
-
-            case 'player_joined':
-                if (data.player) {
-                    players[data.player.id] = data.player;
-                    updateUI();
-                }
-                break;
-
-            case 'player_left':
-                delete players[data.id];
-                updateUI();
-                break;
-        }
-    }
-
-    // ----- 发送完整状态 (主机) -----
-    function sendFullState(peerId) {
-        const channel = dataChannels[peerId];
-        if (!channel || channel.readyState !== 'open') return;
-        channel.send(JSON.stringify({
-            type: 'full_state',
-            players: players,
-            bullets: bullets,
-            obstacles: obstacles,
-            gameRunning: gameRunning,
-            winnerId: winnerId
-        }));
-    }
-
-    // ----- 广播消息 -----
-    function broadcast(data) {
-        for (let id in dataChannels) {
-            const ch = dataChannels[id];
-            if (ch && ch.readyState === 'open') {
-                ch.send(JSON.stringify(data));
-            }
-        }
-    }
-
-    // ============================================================
-    //  游戏逻辑
-    // ============================================================
-
-    // ----- 玩家移动 -----
     function updateLocalPlayer() {
         if (!localPlayer || !localPlayer.alive) return;
 
-        const k = localPlayer.keys;
+        const k = KEYMAP[0];
         let dx = 0, dy = 0;
         if (keys[k.up]) dy -= 1;
         if (keys[k.down]) dy += 1;
         if (keys[k.left]) dx -= 1;
         if (keys[k.right]) dx += 1;
 
-        // 角度 (鼠标)
+        // 鼠标角度
         const angle = Math.atan2(mouseY - localPlayer.y, mouseX - localPlayer.x);
         localPlayer.angle = angle;
 
@@ -684,11 +305,12 @@
         // 射击冷却
         if (localPlayer.shootCooldown > 0) localPlayer.shootCooldown--;
 
-        // 射击 (鼠标左键)
-        if (mousePressed && localPlayer.shootCooldown === 0) {
+        // 射击 (鼠标左键 或 空格)
+        const shouldShoot = mousePressed || keys[k.fire];
+        if (shouldShoot && localPlayer.shootCooldown === 0) {
             const bullet = {
                 id: genId(),
-                ownerId: localId,
+                ownerId: myId,
                 x: localPlayer.x + Math.cos(angle) * 22,
                 y: localPlayer.y + Math.sin(angle) * 22,
                 vx: Math.cos(angle) * 8.5,
@@ -703,29 +325,11 @@
             mousePressed = false;
         }
 
-        // 键盘射击
-        if (keys[k.fire] && localPlayer.shootCooldown === 0) {
-            const bullet = {
-                id: genId(),
-                ownerId: localId,
-                x: localPlayer.x + Math.cos(angle) * 22,
-                y: localPlayer.y + Math.sin(angle) * 22,
-                vx: Math.cos(angle) * 8.5,
-                vy: Math.sin(angle) * 8.5,
-                radius: 5,
-                life: 65,
-                damage: 1
-            };
-            bullets.push(bullet);
-            localPlayer.shootCooldown = 12;
-            broadcast({ type: 'bullet_spawn', bullet: bullet });
-        }
-
         // 广播玩家更新
         broadcast({
             type: 'player_update',
             player: {
-                id: localId,
+                id: myId,
                 x: localPlayer.x,
                 y: localPlayer.y,
                 angle: localPlayer.angle,
@@ -735,7 +339,6 @@
         });
     }
 
-    // ----- 更新子弹 (主机负责碰撞) -----
     function updateBullets() {
         if (!isHost) return;
 
@@ -753,7 +356,7 @@
 
             let used = false;
 
-            // 障碍物
+            // 障碍物碰撞
             for (let ob of obstacles) {
                 if (!ob.alive) continue;
                 if (b.x > ob.x && b.x < ob.x + ob.w && b.y > ob.y && b.y < ob.y + ob.h) {
@@ -770,7 +373,7 @@
                 continue;
             }
 
-            // 玩家
+            // 玩家碰撞
             for (let p of Object.values(players)) {
                 if (!p.alive || p.id === b.ownerId) continue;
                 const dx = p.x - b.x;
@@ -802,15 +405,350 @@
         }
     }
 
-    function rectCircleCollide(rect, circle) {
-        const nearX = Math.max(rect.x, Math.min(circle.x, rect.x + rect.w));
-        const nearY = Math.max(rect.y, Math.min(circle.y, rect.y + rect.h));
-        const dx = circle.x - nearX;
-        const dy = circle.y - nearY;
-        return (dx * dx + dy * dy) < (circle.radius * circle.radius);
+    // ============================================================
+    //  网络通信 (WebRTC)
+    // ============================================================
+
+    const STUN_SERVERS = {
+        iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' }
+        ]
+    };
+
+    function broadcast(data) {
+        const msg = JSON.stringify(data);
+        for (let id in dataChannels) {
+            const ch = dataChannels[id];
+            if (ch && ch.readyState === 'open') {
+                ch.send(msg);
+            }
+        }
     }
 
-    // ----- UI更新 -----
+    function sendTo(peerId, data) {
+        const ch = dataChannels[peerId];
+        if (ch && ch.readyState === 'open') {
+            ch.send(JSON.stringify(data));
+        }
+    }
+
+    function handlePeerMessage(data, peerId) {
+        switch (data.type) {
+            case 'player_info':
+                if (data.player && data.player.id !== myId) {
+                    if (!players[data.player.id]) {
+                        players[data.player.id] = createPlayer(
+                            data.player.id,
+                            data.player.x,
+                            data.player.y,
+                            data.player.name,
+                            data.player.color
+                        );
+                    }
+                    Object.assign(players[data.player.id], data.player);
+                    updateUI();
+                }
+                break;
+
+            case 'player_update':
+                if (data.player && data.player.id !== myId && players[data.player.id]) {
+                    Object.assign(players[data.player.id], data.player);
+                    updateUI();
+                }
+                break;
+
+            case 'bullet_spawn':
+                bullets.push(data.bullet);
+                break;
+
+            case 'bullet_remove':
+                bullets = bullets.filter(b => b.id !== data.bulletId);
+                break;
+
+            case 'player_hit':
+                if (players[data.targetId]) {
+                    players[data.targetId].hp = data.hp;
+                    if (data.hp <= 0) players[data.targetId].alive = false;
+                }
+                break;
+
+            case 'game_over':
+                gameRunning = false;
+                winnerId = data.winnerId;
+                updateUI();
+                break;
+
+            case 'obstacle_damage':
+                for (let ob of obstacles) {
+                    if (ob.id === data.obstacleId) {
+                        ob.hp = data.hp;
+                        if (ob.hp <= 0) ob.alive = false;
+                        break;
+                    }
+                }
+                break;
+
+            case 'sync_request':
+                if (isHost) {
+                    sendTo(peerId, {
+                        type: 'full_state',
+                        players: players,
+                        bullets: bullets,
+                        obstacles: obstacles,
+                        gameRunning: gameRunning,
+                        winnerId: winnerId
+                    });
+                }
+                break;
+
+            case 'full_state':
+                if (!isHost) {
+                    players = data.players || {};
+                    bullets = data.bullets || [];
+                    obstacles = data.obstacles || [];
+                    gameRunning = data.gameRunning !== undefined ? data.gameRunning : true;
+                    winnerId = data.winnerId || null;
+                    if (myId && players[myId]) {
+                        localPlayer = players[myId];
+                    }
+                    updateUI();
+                }
+                break;
+
+            case 'player_joined':
+                if (data.player) {
+                    players[data.player.id] = data.player;
+                    updateUI();
+                }
+                break;
+
+            case 'player_left':
+                delete players[data.id];
+                updateUI();
+                break;
+        }
+    }
+
+    // ----- 设置DataChannel -----
+    function setupDataChannel(channel, peerId) {
+        channel.onopen = () => {
+            console.log('✅ 数据通道已打开:', peerId);
+            statusDisplay.className = 'status online';
+            statusDisplay.textContent = isHost ? '🟢 主机 (已连接)' : '🟢 已连接';
+
+            // 发送玩家信息
+            if (localPlayer) {
+                sendTo(peerId, {
+                    type: 'player_info',
+                    player: {
+                        id: myId,
+                        x: localPlayer.x,
+                        y: localPlayer.y,
+                        color: localPlayer.color,
+                        name: localPlayer.name,
+                        hp: localPlayer.hp,
+                        alive: localPlayer.alive
+                    }
+                });
+            }
+
+            // 如果是客户端，请求完整状态
+            if (!isHost) {
+                sendTo(peerId, { type: 'sync_request' });
+            }
+        };
+
+        channel.onmessage = (e) => {
+            try {
+                const data = JSON.parse(e.data);
+                handlePeerMessage(data, peerId);
+            } catch (err) {
+                console.warn('消息解析失败', err);
+            }
+        };
+
+        channel.onclose = () => {
+            console.log('❌ 数据通道关闭:', peerId);
+            delete dataChannels[peerId];
+            delete peerConnections[peerId];
+            // 移除玩家
+            for (let id in players) {
+                if (id !== myId && !dataChannels[id]) {
+                    delete players[id];
+                }
+            }
+            updateUI();
+            if (Object.keys(dataChannels).length === 0) {
+                statusDisplay.className = 'status offline';
+                statusDisplay.textContent = '🔴 断开连接';
+                isConnected = false;
+            }
+        };
+    }
+
+    // ============================================================
+    //  主机模式
+    // ============================================================
+
+    function createHost() {
+        if (isConnected) disconnect();
+
+        initLocalGame();
+        isHost = true;
+        isConnected = true;
+        statusDisplay.className = 'status online';
+        statusDisplay.textContent = '🟢 主机 (等待加入)';
+        updateUI();
+
+        // 生成信令数据 (Offer)
+        const pc = new RTCPeerConnection(STUN_SERVERS);
+        const channel = pc.createDataChannel('game');
+        const peerId = 'client_' + Date.now();
+
+        peerConnections[peerId] = pc;
+        dataChannels[peerId] = channel;
+        setupDataChannel(channel, peerId);
+
+        pc.onicecandidate = (e) => {
+            if (e.candidate) {
+                // 收集候选
+                if (!pendingCandidates[peerId]) pendingCandidates[peerId] = [];
+                pendingCandidates[peerId].push(e.candidate);
+                updateSignalData(pc, peerId);
+            }
+        };
+
+        pc.createOffer()
+            .then(offer => pc.setLocalDescription(offer))
+            .then(() => {
+                updateSignalData(pc, peerId);
+            });
+
+        // 显示主机ID
+        document.getElementById('hostInput').value = myId;
+        console.log('🎯 主机ID:', myId);
+        alert('✅ 已创建房间！\n你的主机ID是: ' + myId + '\n让其他人输入这个ID加入');
+    }
+
+    function updateSignalData(pc, peerId) {
+        if (pc.localDescription) {
+            const data = {
+                type: 'offer',
+                sdp: pc.localDescription,
+                candidates: pendingCandidates[peerId] || []
+            };
+            // 显示在控制台，也可以复制
+            const encoded = btoa(JSON.stringify(data));
+            console.log('📋 信令数据 (复制此内容给客户端):', encoded);
+            // 存入剪贴板
+            navigator.clipboard?.writeText(encoded).catch(() => {});
+        }
+    }
+
+    // ============================================================
+    //  客户端模式
+    // ============================================================
+
+    function joinHost(hostId) {
+        if (isConnected) disconnect();
+
+        // 客户端需要从主机获取信令数据
+        // 这里通过粘贴方式获取
+        const signalInput = prompt('请粘贴主机提供的信令数据:');
+        if (!signalInput) {
+            alert('需要信令数据才能连接');
+            return;
+        }
+
+        try {
+            const signalData = JSON.parse(atob(signalInput));
+            initLocalGame();
+            isHost = false;
+            isConnected = true;
+            statusDisplay.className = 'status connecting';
+            statusDisplay.textContent = '🟡 连接中...';
+
+            const pc = new RTCPeerConnection(STUN_SERVERS);
+            const peerId = hostId;
+
+            pc.ondatachannel = (event) => {
+                const channel = event.channel;
+                dataChannels[peerId] = channel;
+                peerConnections[peerId] = pc;
+                setupDataChannel(channel, peerId);
+            };
+
+            pc.onicecandidate = (e) => {
+                if (e.candidate && signalData) {
+                    // 发送候选回主机 (通过广播或其他方式)
+                    // 这里简化，实际需要双向信令
+                    console.log('ICE候选:', e.candidate);
+                }
+            };
+
+            // 设置远程描述
+            pc.setRemoteDescription(new RTCSessionDescription(signalData.sdp))
+                .then(() => pc.createAnswer())
+                .then(answer => pc.setLocalDescription(answer))
+                .then(() => {
+                    // 发送answer回主机
+                    const answerData = {
+                        type: 'answer',
+                        sdp: pc.localDescription,
+                        candidates: []
+                    };
+                    const encoded = btoa(JSON.stringify(answerData));
+                    console.log('📋 回答数据 (复制给主机):', encoded);
+                    navigator.clipboard?.writeText(encoded).catch(() => {});
+                    alert('✅ 已生成回答数据，请复制并发送给主机！\n数据已复制到剪贴板');
+                });
+
+            // 添加ICE候选
+            if (signalData.candidates) {
+                for (let cand of signalData.candidates) {
+                    pc.addIceCandidate(new RTCIceCandidate(cand));
+                }
+            }
+
+            // 存储连接
+            peerConnections[peerId] = pc;
+
+        } catch (e) {
+            console.error('加入失败', e);
+            alert('连接失败: ' + e.message);
+            statusDisplay.className = 'status offline';
+            statusDisplay.textContent = '🔴 连接失败';
+            isConnected = false;
+        }
+    }
+
+    // ============================================================
+    //  辅助：处理主机收到的回答
+    // ============================================================
+
+    // 主机收到客户端回答后调用
+    function handleClientAnswer(answerData, peerId) {
+        const pc = peerConnections[peerId];
+        if (!pc) return;
+
+        pc.setRemoteDescription(new RTCSessionDescription(answerData.sdp));
+
+        if (answerData.candidates) {
+            for (let cand of answerData.candidates) {
+                pc.addIceCandidate(new RTCIceCandidate(cand));
+            }
+        }
+
+        statusDisplay.className = 'status online';
+        statusDisplay.textContent = '🟢 主机 (已连接)';
+        console.log('✅ 客户端已连接');
+    }
+
+    // ============================================================
+    //  UI更新 & 绘图
+    // ============================================================
+
     function updateUI() {
         const count = Object.keys(players).length;
         playerCountEl.textContent = count;
@@ -825,28 +763,24 @@
         }
     }
 
-    // ============================================================
-    //  绘图
-    // ============================================================
-
     function draw() {
         ctx.clearRect(0, 0, 800, 600);
 
-        // 背景
-        ctx.strokeStyle = '#2a5468';
+        // 背景网格
+        ctx.strokeStyle = '#2a4a5a';
         ctx.lineWidth = 1;
         for (let i = 0; i < 800; i += 40) {
             ctx.beginPath();
             ctx.moveTo(i, 0);
             ctx.lineTo(i, 600);
-            ctx.strokeStyle = '#26505f';
+            ctx.strokeStyle = '#2a4a5a';
             ctx.stroke();
         }
         for (let i = 0; i < 600; i += 40) {
             ctx.beginPath();
             ctx.moveTo(0, i);
             ctx.lineTo(800, i);
-            ctx.strokeStyle = '#26505f';
+            ctx.strokeStyle = '#2a4a5a';
             ctx.stroke();
         }
 
@@ -854,7 +788,7 @@
         for (let ob of obstacles) {
             if (!ob.alive) continue;
             const alpha = 0.5 + 0.5 * (ob.hp / ob.maxHp);
-            ctx.fillStyle = `rgba(90, 130, 150, ${alpha})`;
+            ctx.fillStyle = `rgba(70, 120, 140, ${alpha})`;
             ctx.shadowColor = '#aaccdd';
             ctx.shadowBlur = 8;
             ctx.fillRect(ob.x, ob.y, ob.w, ob.h);
@@ -925,16 +859,18 @@
             ctx.fillText('❤️'.repeat(Math.max(0, p.hp)), p.x - 18, p.y - 30);
             ctx.fillStyle = '#e0f0ff';
             ctx.font = 'bold 12px sans-serif';
-            ctx.fillText(p.name || `玩家${id}`, p.x - 20, p.y - 50);
+            ctx.fillText(p.name || `玩家`, p.x - 20, p.y - 50);
             ctx.shadowBlur = 0;
 
             // 标记自己
-            if (id === localId) {
+            if (id === myId) {
                 ctx.strokeStyle = '#ffffff';
-                ctx.lineWidth = 3;
+                ctx.lineWidth = 2;
+                ctx.setLineDash([4, 4]);
                 ctx.beginPath();
-                ctx.arc(p.x, p.y, 20, 0, 2 * Math.PI);
+                ctx.arc(p.x, p.y, 22, 0, 2 * Math.PI);
                 ctx.stroke();
+                ctx.setLineDash([]);
             }
         }
 
@@ -959,7 +895,7 @@
 
         // 游戏结束
         if (!gameRunning) {
-            ctx.fillStyle = 'rgba(0,0,0,0.35)';
+            ctx.fillStyle = 'rgba(0,0,0,0.4)';
             ctx.fillRect(0, 0, 800, 600);
             ctx.font = 'bold 44px sans-serif';
             ctx.fillStyle = '#ffe484';
@@ -996,25 +932,21 @@
     // ============================================================
 
     function disconnect() {
-        // 关闭所有连接
         for (let id in dataChannels) {
             try { dataChannels[id].close(); } catch (e) {}
         }
         for (let id in peerConnections) {
             try { peerConnections[id].close(); } catch (e) {}
         }
-        if (signalChannel) {
-            try { signalChannel.close(); } catch (e) {}
-            signalChannel = null;
-        }
         dataChannels = {};
         peerConnections = {};
+        pendingCandidates = {};
         isConnected = false;
         isHost = false;
         players = {};
         bullets = [];
         localPlayer = null;
-        localId = null;
+        myId = null;
         statusDisplay.className = 'status offline';
         statusDisplay.textContent = '⚪ 未连接';
         updateUI();
@@ -1024,7 +956,6 @@
     //  事件绑定
     // ============================================================
 
-    // 按钮
     document.getElementById('hostBtn').addEventListener('click', createHost);
     document.getElementById('joinBtn').addEventListener('click', () => {
         const hostId = document.getElementById('hostInput').value.trim();
@@ -1055,7 +986,6 @@
     canvas.addEventListener('mouseup', (e) => {
         if (e.button === 0) {
             e.preventDefault();
-            // 不重置，由 updateLocalPlayer 处理
         }
     });
 
@@ -1065,7 +995,7 @@
     document.addEventListener('keydown', (e) => {
         const key = e.key.toLowerCase();
         keys[key] = true;
-        if (['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright',' ','shift'].includes(key) || e.key === ' ') {
+        if (['w', 'a', 's', 'd', ' '].includes(key) || e.key === ' ') {
             e.preventDefault();
         }
     });
@@ -1073,7 +1003,7 @@
     document.addEventListener('keyup', (e) => {
         const key = e.key.toLowerCase();
         keys[key] = false;
-        if (['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright',' ','shift'].includes(key) || e.key === ' ') {
+        if (['w', 'a', 's', 'd', ' '].includes(key) || e.key === ' ') {
             e.preventDefault();
         }
     });
@@ -1083,14 +1013,26 @@
         mousePressed = false;
     });
 
-    // 启动
-    console.log('🎮 局域网联机枪战已启动');
-    console.log('💡 一人点击"创建房间"，其他人输入主机ID后点击"加入"');
+    // ----- 暴露信令处理函数 (用于手动交换) -----
+    window.handleClientAnswer = handleClientAnswer;
+    window.handleSignalData = function(data, peerId) {
+        // 用于处理客户端发来的信令
+        try {
+            const parsed = typeof data === 'string' ? JSON.parse(atob(data)) : data;
+            if (parsed.type === 'answer') {
+                handleClientAnswer(parsed, peerId || 'client_1');
+            }
+        } catch (e) {
+            console.error('信令处理失败', e);
+        }
+    };
 
-    // 检测局域网
-    if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-        document.getElementById('hostInput').value = window.location.hostname;
-    }
+    // 初始化
+    console.log('🎮 局域网联机枪战已启动');
+    console.log('📋 使用说明:');
+    console.log('1. 一人点击"创建房间"，获得主机ID');
+    console.log('2. 其他人输入主机ID，点击"加入"');
+    console.log('3. 按照提示复制粘贴信令数据完成连接');
 
     gameLoop();
 </script>
