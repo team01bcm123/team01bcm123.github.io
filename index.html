@@ -1,1586 +1,854 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OJ平台模拟器 · 经营大厅</title>
+    <title>🔫 P2P 联机枪战 · 无需服务器</title>
+    <!-- 使用 PeerJS 实现 P2P 连接 -->
+    <script src="https://unpkg.com/peerjs@1.5.1/dist/peerjs.min.js"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Segoe UI', 'PingFang SC', system-ui, sans-serif;
-        }
-
-        /* 黑夜模式（默认） */
+        * { box-sizing: border-box; user-select: none; }
         body {
-            background: linear-gradient(135deg, #0b1a2a 0%, #1a2f40 100%);
-            color: #e0e8f0;
+            margin: 0;
             min-height: 100vh;
-            transition: all 0.3s ease;
-        }
-
-        /* 白天模式 */
-        body.day-mode {
-            background: linear-gradient(135deg, #e0f2fe 0%, #b8d8f0 100%);
-            color: #1e2b3c;
-        }
-
-        body.day-mode .status-bar {
-            background: rgba(255, 255, 255, 0.9);
-            border: 1px solid #3b8cbf;
-            color: #1e2b3c;
-        }
-
-        body.day-mode .card {
-            background: rgba(255, 255, 255, 0.95);
-            border: 1px solid #3b8cbf;
-            color: #1e2b3c;
-        }
-
-        body.day-mode .card-header {
-            border-bottom-color: #3b8cbf;
-        }
-
-        body.day-mode input,
-        body.day-mode select {
-            background: white;
-            border: 1px solid #3b8cbf;
-            color: #1e2b3c;
-        }
-
-        body.day-mode .list-item {
-            border-bottom-color: #cbd5e0;
-        }
-
-        body.day-mode .rankings-area {
-            background: rgba(255, 255, 255, 0.9);
-            border: 1px solid #3b8cbf;
-        }
-
-        body.day-mode .forum-post {
-            background: rgba(240, 248, 255, 0.9);
-        }
-
-        body.day-mode .modal-content {
-            background: white;
-            color: #1e2b3c;
-        }
-
-        body.day-mode .modal-content input {
-            background: #f0f8ff;
-            color: #1e2b3c;
-        }
-
-        body.day-mode .timer-box {
-            background: #d4e0ec;
-        }
-
-        body.day-mode .timer {
-            color: #3b8cbf;
-        }
-
-        body.day-mode .maintenance-tip {
-            background: rgba(59, 140, 191, 0.1);
-            border-color: #3b8cbf;
-            color: #3b8cbf;
-        }
-
-        body.day-mode .warning-tip {
-            background: rgba(240, 173, 78, 0.1);
-            border-color: #f0ad4e;
-        }
-
-        body.day-mode .toxic-warning {
-            background: rgba(217, 83, 79, 0.1);
-            border-color: #d9534f;
-        }
-
-        body.day-mode .btn {
-            background: #3b8cbf;
-        }
-
-        body.day-mode .btn-warning {
-            background: #f0ad4e;
-            color: white;
-        }
-
-        body.day-mode .btn-danger {
-            background: #d9534f;
-        }
-
-        body.day-mode .btn-success {
-            background: #5cb85c;
-        }
-
-        body.day-mode .forum-post {
-            background: #f8fafc;
-        }
-
-        body.day-mode .tag {
-            background: #e2e8f0;
-            color: #1e2b3c;
-        }
-
-        .main-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 2rem;
-        }
-
-        .site-title {
-            text-align: center;
-            margin: 2rem 0;
-        }
-        .site-title h1 {
-            font-size: 4rem;
-            font-weight: 800;
-            background: linear-gradient(135deg, #ffd966, #6bb9f0, #9b59b6);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .theme-switch {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 1000;
-        }
-        .theme-btn {
-            background: rgba(255, 255, 255, 0.2);
-            backdrop-filter: blur(10px);
-            border: 2px solid #ffd966;
-            color: inherit;
-            padding: 0.8rem 1.5rem;
-            border-radius: 40px;
-            cursor: pointer;
-            font-size: 1rem;
-            font-weight: 600;
+            background: #0e1e2b;
             display: flex;
+            justify-content: center;
             align-items: center;
-            gap: 10px;
-            transition: all 0.3s;
+            font-family: 'Segoe UI', sans-serif;
         }
-        .theme-btn:hover {
-            transform: scale(1.05);
-            background: rgba(255, 255, 255, 0.3);
+        .container {
+            background: #1f4055;
+            padding: 18px 22px 22px;
+            border-radius: 40px;
+            border: 1px solid #3d7a94;
+            box-shadow: 0 20px 30px rgba(0,0,0,0.7);
         }
-
-        .status-bar {
-            background: #102331;
-            padding: 1.5rem;
-            border-radius: 16px;
-            margin-bottom: 2rem;
+        canvas {
+            display: block;
+            background: #1f3f4f;
+            border-radius: 24px;
+            box-shadow: inset 0 0 0 2px #4d8ba8;
+            width: 800px;
+            height: 600px;
+            cursor: crosshair;
+        }
+        .panel {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            margin-top: 12px;
+            color: #d4edff;
             flex-wrap: wrap;
-            gap: 1rem;
-            transition: all 0.3s;
+            gap: 8px;
         }
-
-        .stats {
-            display: flex;
-            gap: 3rem;
+        .status {
+            background: #102b38;
+            padding: 4px 16px;
+            border-radius: 40px;
+            border: 1px solid #2f6279;
+            font-size: 0.85rem;
         }
-        .stat-item {
-            text-align: center;
-        }
-        .stat-label {
-            font-size: 0.9rem;
-            opacity: 0.7;
-        }
-        .stat-value {
-            font-size: 1.8rem;
-            font-weight: 700;
-        }
-        .money { color: #ffd966; }
-        .users { color: #5cb85c; }
-        .vip { color: #9b59b6; }
-        .toxic { color: #d9534f; }
-
-        .maintenance-tip {
-            font-size: 0.9rem;
-            color: #ffd966;
-            background: rgba(255, 215, 0, 0.1);
-            padding: 0.3rem 1rem;
-            border-radius: 20px;
-            border: 1px solid #ffd966;
-            display: inline-block;
-        }
-
-        .warning-tip {
-            font-size: 0.9rem;
-            color: #f0ad4e;
-            background: rgba(240, 173, 78, 0.1);
-            padding: 0.3rem 1rem;
-            border-radius: 20px;
-            border: 1px solid #f0ad4e;
-            display: inline-block;
-            animation: pulse 2s infinite;
-        }
-
-        .toxic-warning {
-            font-size: 0.9rem;
-            color: #d9534f;
-            background: rgba(217, 83, 79, 0.1);
-            padding: 0.3rem 1rem;
-            border-radius: 20px;
-            border: 1px solid #d9534f;
-            display: inline-block;
-            animation: pulse 1s infinite;
-        }
-
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.7; }
-            100% { opacity: 1; }
-        }
-
-        .user-info {
-            display: flex;
-            gap: 1rem;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-        .username {
-            color: #ffd966;
-            font-size: 1.2rem;
-            font-weight: 600;
-        }
-
-        .button-group {
-            display: flex;
-            gap: 0.5rem;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-
+        .status .online { color: #6fcf97; }
+        .status .offline { color: #eb5757; }
         .btn {
-            background: #3b8cbf;
-            color: white;
+            background: #4f8aa8;
             border: none;
-            padding: 0.6rem 1.2rem;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 0.95rem;
-            transition: 0.2s;
-            white-space: nowrap;
-        }
-        .btn:hover {
-            background: #4fa3d9;
-            transform: translateY(-2px);
-        }
-        .btn-warning {
-            background: #f0ad4e;
-        }
-        .btn-warning:hover {
-            background: #ffc107;
-        }
-        .btn-danger {
-            background: #d9534f;
-        }
-        .btn-danger:hover {
-            background: #c9302c;
-        }
-        .btn-success {
-            background: #5cb85c;
-        }
-        .btn-large {
-            font-size: 2rem;
-            padding: 1.5rem 4rem;
-            background: linear-gradient(135deg, #3b8cbf, #2c4f73);
-        }
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-        .btn:disabled:hover {
-            transform: none;
-            background: #3b8cbf;
-        }
-
-        .ban-btn {
-            background: #d9534f;
             color: white;
-            border: none;
-            padding: 0.2rem 0.8rem;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 0.8rem;
-            margin-left: 0.5rem;
-        }
-        .ban-btn:hover {
-            background: #c9302c;
-        }
-
-        .timer-box {
-            background: #1e3a5f;
-            padding: 0.5rem 1.5rem;
-            border-radius: 40px;
-            text-align: center;
-            min-width: 100px;
-            transition: all 0.3s;
-        }
-        .timer {
-            font-size: 1.8rem;
-            font-family: 'Courier New', monospace;
             font-weight: 700;
-            color: #ffd966;
-        }
-
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 1.5rem;
-            margin-bottom: 2rem;
-        }
-
-        .card {
-            background: #1e2f40;
-            border-radius: 16px;
-            padding: 1.5rem;
-            border: 1px solid #2c4058;
-            transition: all 0.3s;
-        }
-
-        .card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1rem;
-            border-bottom: 1px solid #2c4058;
-            padding-bottom: 0.5rem;
-            transition: all 0.3s;
-        }
-
-        input, select {
-            width: 100%;
-            padding: 0.8rem;
-            margin: 0.5rem 0;
-            background: #1b344d;
-            border: 1px solid #2c4058;
-            color: white;
-            border-radius: 8px;
-            font-size: 1rem;
-            transition: all 0.3s;
-        }
-
-        .list-item {
-            padding: 0.8rem;
-            border-bottom: 1px solid #2c4058;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            transition: all 0.3s;
-        }
-
-        .forum-post {
-            background: #1b344d;
-            border-radius: 12px;
-            padding: 1rem;
-            margin-bottom: 1rem;
-            border-left: 4px solid;
-            animation: fadeIn 0.3s;
-            transition: all 0.3s;
-            position: relative;
-        }
-        .forum-post.happy { border-left-color: #5cb85c; }
-        .forum-post.angry { border-left-color: #f0ad4e; }
-        .forum-post.neutral { border-left-color: #9b59b6; }
-        .forum-post.toxic { border-left-color: #d9534f; background: rgba(217, 83, 79, 0.1); }
-        .forum-post.toxic .post-author { color: #d9534f; }
-        .forum-post.toxic .post-content { color: #ff9999; }
-        
-        .post-header {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 0.5rem;
+            padding: 5px 16px;
+            border-radius: 40px;
+            cursor: pointer;
             font-size: 0.9rem;
+            transition: 0.15s;
+            border: 1px solid #8bc9e6;
         }
-        .post-author {
-            color: #ffd966;
-            font-weight: 600;
-        }
-        .post-time {
-            color: #9aaec2;
-        }
-        .post-content {
-            line-height: 1.5;
-            margin-bottom: 0.5rem;
-            word-break: break-word;
-        }
-        .post-footer {
+        .btn:hover { background: #5f9ab8; }
+        .btn.danger { background: #c74e3c; border-color: #e6836e; }
+        .btn.danger:hover { background: #d85e4c; }
+        .btn.success { background: #27ae60; border-color: #6fcf97; }
+        .btn.success:hover { background: #2ecc71; }
+        .input-group {
             display: flex;
-            justify-content: space-between;
+            gap: 6px;
             align-items: center;
         }
-        .post-tags {
+        .input-group input {
+            background: #0e2a38;
+            border: 1px solid #2f6279;
+            border-radius: 30px;
+            padding: 4px 12px;
+            color: #d4edff;
+            width: 100px;
+            font-size: 0.85rem;
+        }
+        .input-group input:focus { outline: none; border-color: #4d8ba8; }
+        .hint {
+            color: #9ec3d6;
+            font-size: 0.75rem;
             display: flex;
-            gap: 0.5rem;
+            gap: 12px;
             flex-wrap: wrap;
+            margin-top: 6px;
         }
-        .tag {
-            background: #2c4058;
-            padding: 0.2rem 0.8rem;
-            border-radius: 20px;
+        .hint span { background: #13303f; padding: 2px 10px; border-radius: 30px; border: 1px solid #2b6279; }
+        .player-list {
             font-size: 0.8rem;
-            transition: all 0.3s;
+            color: #b3def5;
+            background: #102b38;
+            padding: 2px 14px;
+            border-radius: 30px;
+            border: 1px solid #2f6279;
         }
-        .tag.toxic-tag {
-            background: #d9534f;
-            color: white;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .rankings-area {
-            background: #1e2f40;
-            border-radius: 16px;
-            padding: 1.5rem;
-            margin: 2rem 0;
-            transition: all 0.3s;
-        }
-
-        .rank-item {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            padding: 0.8rem;
-            border-bottom: 1px solid #2c4058;
-        }
-
-        .rank-number {
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-        }
-        .rank-1 .rank-number { background: gold; color: black; }
-        .rank-2 .rank-number { background: silver; color: black; }
-        .rank-3 .rank-number { background: #cd7f32; color: black; }
-
-        .modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.95);
-            display: none;
-            justify-content: center;
-            align-items: center;
-            z-index: 3000;
-        }
-        .modal.active {
-            display: flex;
-        }
-        .modal-content {
-            background: #1e2f40;
-            padding: 2rem;
-            border-radius: 16px;
-            width: 90%;
-            max-width: 500px;
-            max-height: 80vh;
-            overflow-y: auto;
-            transition: all 0.3s;
-        }
-
-        .score-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 0.8rem;
-            border-bottom: 1px solid #2c4058;
-            font-size: 1.1rem;
-        }
-        .total-score {
-            font-size: 2rem;
-            color: #ffd966;
-            text-align: center;
-            margin: 1rem 0;
-        }
-
-        .limit-tip {
-            font-size: 0.8rem;
-            color: #ffd966;
-            margin-left: 0.5rem;
-        }
-
-        .setup-label {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            color: #9aaec2;
-            font-size: 0.9rem;
-            margin-bottom: 0.2rem;
-        }
-        .setup-range {
-            color: #ffd966;
-            font-size: 0.8rem;
-        }
-
-        @media (max-width: 768px) {
-            .grid {
-                grid-template-columns: 1fr;
-            }
-            .site-title h1 {
-                font-size: 2.5rem;
-            }
+        @media (max-width: 860px) {
+            canvas { width: 100%; height: auto; aspect-ratio: 4/3; }
+            .container { padding: 10px; }
+            .panel { flex-direction: column; align-items: stretch; }
+            .input-group { justify-content: center; }
         }
     </style>
 </head>
 <body>
-    <div class="theme-switch">
-        <button class="theme-btn" onclick="toggleTheme()" id="themeToggle">
-            <i class="fas fa-sun"></i>
-            <span>白天模式</span>
-        </button>
+<div class="container">
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <div class="panel">
+        <div class="status" id="statusDisplay">🔴 <span class="offline">未连接</span></div>
+        <div class="input-group">
+            <input type="text" id="peerIdInput" placeholder="对方ID" value="">
+            <button class="btn success" id="connectBtn">📞 连接</button>
+            <button class="btn" id="createBtn">🎯 创建房间</button>
+        </div>
+        <div class="player-list" id="playerList">👥 0 人</div>
     </div>
-
-    <!-- 登录模态框 -->
-    <div id="loginModal" class="modal">
-        <div class="modal-content">
-            <h2 style="margin-bottom: 1rem;">🔑 登录</h2>
-            <input type="text" id="loginUsername" placeholder="用户名">
-            <input type="password" id="loginPassword" placeholder="密码">
-            <button class="btn" onclick="handleLogin()" style="width:100%">登录</button>
-            <button class="btn" onclick="showRegister()" style="width:100%; margin-top:0.5rem; background:#5cb85c;">注册新账号</button>
-        </div>
+    <div class="hint">
+        <span>🖱️ 鼠标瞄准 · 左键射击</span>
+        <span>WASD 移动</span>
+        <span>💡 双方都需打开此页面</span>
     </div>
+</div>
 
-    <div id="registerModal" class="modal">
-        <div class="modal-content">
-            <h2 style="margin-bottom: 1rem;">📝 注册</h2>
-            <input type="text" id="regUsername" placeholder="用户名">
-            <input type="password" id="regPassword" placeholder="密码">
-            <input type="password" id="regConfirm" placeholder="确认密码">
-            <button class="btn" onclick="handleRegister()" style="width:100%">注册</button>
-            <button class="btn" onclick="backToLogin()" style="width:100%; margin-top:0.5rem;">返回登录</button>
-        </div>
-    </div>
+<script>
+    // ============================================================
+    //  🚀 P2P 联机枪战 (PeerJS)
+    //  无需服务器，点对点直连
+    // ============================================================
 
-    <div id="setupModal" class="modal">
-        <div class="modal-content">
-            <h2 style="margin-bottom: 1.5rem;">⚙️ 开局设置</h2>
-            <div class="setup-label">
-                <span>🏷️ 平台名称</span>
-            </div>
-            <input type="text" id="setupPlatform" placeholder="例如：我的OJ" value="我的OJ">
-            <div class="setup-label">
-                <span>💰 初始资金</span>
-                <span class="setup-range">(10000 ~ 100000)</span>
-            </div>
-            <input type="number" id="setupMoney" min="10000" max="100000" value="50000">
-            <div class="setup-label">
-                <span>👥 初始用户</span>
-                <span class="setup-range">(1000 ~ 5000)</span>
-            </div>
-            <input type="number" id="setupUsers" min="1000" max="5000" value="2500">
-            <button class="btn" onclick="startNewGame()" style="width:100%; margin-top:1rem;">开始经营</button>
-        </div>
-    </div>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const statusDisplay = document.getElementById('statusDisplay');
+    const playerList = document.getElementById('playerList');
 
-    <div id="createTeamModal" class="modal">
-        <div class="modal-content">
-            <h2 style="margin-bottom: 1rem;">⚔️ 创建新战队</h2>
-            <p style="color: #ffd966; margin-bottom: 0.5rem;">战队上限: 3个</p>
-            <input type="text" id="teamNameInput" placeholder="输入战队名称" value="青云战队">
-            <p style="color: #9aaec2; margin: 0.5rem 0;">创建费用: ¥300</p>
-            <div style="display: flex; gap: 1rem;">
-                <button class="btn" onclick="createTeamWithName()" style="flex:1;">确认创建</button>
-                <button class="btn" onclick="closeCreateTeamModal()" style="flex:1; background:#6c757d;">取消</button>
-            </div>
-        </div>
-    </div>
+    // ----- 游戏状态 -----
+    let players = {};           // { id: { x, y, angle, hp, alive, name, color } }
+    let bullets = [];
+    let obstacles = [];
+    let myId = null;
+    let peer = null;
+    let connections = {};       // { peerId: DataConnection }
+    let gameRunning = true;
+    let winnerId = null;
+    let isHost = false;
+    let localPlayer = null;
 
-    <div id="settlementModal" class="modal">
-        <div class="modal-content">
-            <h2 style="text-align: center; margin-bottom: 1rem;">📊 最终结算报告</h2>
-            <div id="settlementContent"></div>
-            <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
-                <button class="btn btn-success" onclick="saveAndRestart()" style="flex:1;">新游戏</button>
-                <button class="btn" onclick="closeSettlement()" style="flex:1;">返回首页</button>
-            </div>
-        </div>
-    </div>
+    const COLORS = ['#f2c94c', '#eb5757', '#2f9bff', '#6fcf97', '#bb6bd9', '#f2994a', '#27ae60', '#e74c3c'];
+    const NAMES = ['🟡 黄', '🔴 红', '🔵 蓝', '🟢 绿', '🟣 紫', '🟠 橙', '🟢 翠', '🔴 赤'];
 
-    <div id="rankingsModal" class="modal">
-        <div class="modal-content">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                <h2>🏆 完整排行榜 <span style="font-size:0.9rem; color:#ffd966;">(每人仅保留最高分)</span></h2>
-                <span onclick="closeRankingsModal()" style="cursor: pointer; font-size: 2rem;">&times;</span>
-            </div>
-            <div id="fullRankingsList"></div>
-        </div>
-    </div>
+    // 鼠标状态
+    let mouseX = 400, mouseY = 300;
+    let mousePressed = false;
+    let shootCooldown = 0;
 
-    <div id="welcomePage" class="main-container">
-        <div class="site-title">
-            <h1>OJ平台模拟器</h1>
-            <p style="opacity:0.7; margin-top:1rem;">点击下方按钮开始你的经营之旅</p>
-        </div>
-        <div style="text-align: center; margin: 4rem 0;">
-            <button class="btn btn-large" onclick="showGameInterface()">
-                <i class="fas fa-play" style="margin-right: 1rem;"></i>
-                开始经营
-            </button>
-        </div>
-        <div class="rankings-area">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                <h2><i class="fas fa-trophy"></i> 排行榜 <span style="font-size:0.9rem; color:#ffd966;">(历史最高)</span></h2>
-                <button class="btn btn-small" onclick="showFullRankings()">查看全部</button>
-            </div>
-            <div id="rankingsList"></div>
-        </div>
-    </div>
+    // 键盘
+    const keys = {};
 
-    <div id="gameHall" style="display: none;">
-        <div class="main-container">
-            <div class="status-bar">
-                <div class="stats">
-                    <div class="stat-item">
-                        <div class="stat-label">💰 资金</div>
-                        <div class="stat-value money" id="moneyDisplay">0</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-label">👥 用户</div>
-                        <div class="stat-value users" id="usersDisplay">0</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-label">👑 VIP</div>
-                        <div class="stat-value vip" id="vipDisplay">0</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-label">🤬 不文明</div>
-                        <div class="stat-value toxic" id="toxicCountDisplay">0</div>
-                    </div>
-                </div>
-                <div class="user-info">
-                    <span class="username" id="usernameDisplay"></span>
-                    <span class="maintenance-tip" id="maintenanceTip">每日维护费: ¥0</span>
-                    <span class="warning-tip" id="problemWarning" style="display: none;">⚠️ 题目太少</span>
-                    <span class="toxic-warning" id="toxicWarning" style="display: none;">🤬 有不文明用户</span>
-                    <div class="button-group">
-                        <button class="btn btn-warning" onclick="forceEndDay()">⚡ 每日结算</button>
-                        <button class="btn btn-danger" onclick="settleGame()">📊 存档结算</button>
-                        <button class="btn" onclick="showFullRankings()">🏆 排行榜</button>
-                        <button class="btn" onclick="logout()">退出</button>
-                    </div>
-                    <div class="timer-box">
-                        <div class="timer" id="timer">60</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="grid">
-                <div class="card">
-                    <div class="card-header">
-                        <h3>🏁 发布比赛</h3>
-                    </div>
-                    <input type="text" id="contestName" placeholder="比赛名称" value="新手赛">
-                    <input type="number" id="contestPrize" placeholder="奖金" value="100" min="10">
-                    <input type="number" id="contestDuration" placeholder="持续天数" value="3" min="1" max="7">
-                    <button class="btn" onclick="publishContest()">发布比赛</button>
-                </div>
-
-                <div class="card">
-                    <div class="card-header">
-                        <h3>📝 发布题目 <span class="limit-tip" id="problemCountTip">(0道)</span></h3>
-                    </div>
-                    <input type="text" id="problemTitle" placeholder="题目标题" value="A+B">
-                    <select id="problemDifficulty">
-                        <option value="入门">入门 (¥30)</option>
-                        <option value="普及">普及 (¥50)</option>
-                        <option value="提高">提高 (¥80)</option>
-                        <option value="省选">省选 (¥120)</option>
-                        <option value="NOI">NOI (¥200)</option>
-                    </select>
-                    <button class="btn" onclick="publishProblem()">发布题目</button>
-                    <p style="font-size:0.8rem; color:#f0ad4e; margin-top:0.5rem;">⚠️ 题目太少会导致用户流失</p>
-                </div>
-
-                <div class="card">
-                    <div class="card-header">
-                        <h3>📢 运营活动</h3>
-                    </div>
-                    <select id="adLevel">
-                        <option value="small">小宣传 ¥200</option>
-                        <option value="medium" selected>中宣传 ¥500</option>
-                        <option value="large">大宣传 ¥1000</option>
-                    </select>
-                    <button class="btn" onclick="doAdvertising()">开始宣传</button>
-                    <button class="btn" onclick="promoteVIP()" style="background:#9b59b6;">推广VIP ¥500</button>
-                    <button class="btn" onclick="showCreateTeamModal()" style="background:#5cb85c;" id="createTeamBtn">创建战队 ¥300</button>
-                    <span class="limit-tip" id="teamLimitTip">(0/3)</span>
-                    <button class="btn" onclick="organizeTeamMatch()" style="background:#5cb85c; margin-top:0.5rem;" id="organizeMatchBtn">组织比赛 ¥500</button>
-                </div>
-            </div>
-
-            <div class="grid">
-                <div class="card">
-                    <div class="card-header">
-                        <h3>🏆 进行中的比赛</h3>
-                    </div>
-                    <div id="contestList"></div>
-                </div>
-                <div class="card">
-                    <div class="card-header">
-                        <h3>📚 题目列表</h3>
-                    </div>
-                    <div id="problemList"></div>
-                </div>
-                <div class="card">
-                    <div class="card-header">
-                        <h3>⚔️ 战队列表 <span class="limit-tip" id="teamCountDisplay">(0/3)</span></h3>
-                    </div>
-                    <div id="teamList"></div>
-                </div>
-            </div>
-
-            <div class="grid">
-                <div class="card">
-                    <div class="card-header">
-                        <h3>🤺 战队比赛</h3>
-                    </div>
-                    <div id="teamMatchList"></div>
-                </div>
-                <div class="card">
-                    <div class="card-header">
-                        <h3>💬 讨论区 <span style="font-size:0.8rem; color:#ffd966;">(每个用户都可封禁)</span></h3>
-                    </div>
-                    <div id="forumList" style="max-height: 500px; overflow-y: auto;"></div>
-                </div>
-                <div class="card">
-                    <div class="card-header">
-                        <h3>📰 平台日报</h3>
-                    </div>
-                    <div id="newsList" style="max-height: 500px; overflow-y: auto;"></div>
-                </div>
-            </div>
-
-            <div class="rankings-area">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 1rem;">
-                    <h2><i class="fas fa-trophy"></i> 管理者排行榜 <span style="font-size:0.9rem; color:#ffd966;">(历史最高)</span></h2>
-                    <div>
-                        <span id="myRankDisplay" style="color: #ffd966; margin-right: 1rem;"></span>
-                        <button class="btn btn-small" onclick="showFullRankings()">查看全部</button>
-                    </div>
-                </div>
-                <div id="gameRankingsList"></div>
-            </div>
-        </div>
-    </div>
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/js/all.min.js"></script>
-
-    <script>
-        // 存储所有用户数据
-        let users = {};
-        let currentUser = null;
-        let gameState = null;
-        let rankings = [];
-        let timeLeft = 60;
-        let timerInterval = null;
-
-        // 正常用户评论库
-        const forumComments = [
-            { author: '机房惨案受害者', content: '好基友把我机房惨案了！他已成功预约线下肢体交流服务！！！', mood: 'angry' },
-            { author: '摸鱼大王', content: '呜呜呜，上课摸鱼被教官制裁了，扣了我50分😭', mood: 'angry' },
-            { author: '代码狗', content: '今天AC了道黑题，隔壁桌投来崇拜的目光嘿嘿嘿', mood: 'happy' },
-            { author: '卷王之王', content: '凌晨三点还在刷题，我妈以为我在打游戏', mood: 'neutral' },
-            { author: '退役选手', content: '想起当年OI生涯，现在只能当个码农了', mood: 'neutral' },
-            { author: '新生萌新', content: '大佬们，请问A+B怎么做？在线等急！', mood: 'neutral' },
-            { author: '暴躁老哥', content: '这什么破题，卡我三天了！我要砸电脑！', mood: 'angry' },
-            { author: '幸运儿', content: '今天随手一交，竟然拿了全场最佳，奖金+50！', mood: 'happy' },
-            { author: '数学王子', content: '数论题yyds，就是有点费头发', mood: 'happy' },
-            { author: '图论菜鸟', content: '最短路怎么又双叒叕WA了，求大佬debug', mood: 'angry' },
-            { author: '食堂大妈', content: '今天食堂的菜又咸了，差评！', mood: 'angry' },
-            { author: '宿管阿姨', content: '晚上11点还不睡觉，明天上课又要迟到', mood: 'neutral' },
-            { author: '隔壁老王', content: '听说这个OJ有奖金赛，我来凑个热闹', mood: 'happy' },
-            { author: '学霸君', content: '这次比赛我势在必得，奖金是我的！', mood: 'happy' },
-            { author: '学渣本渣', content: '又爆零了，我是不是不适合学OI', mood: 'angry' },
-            { author: '程序员大叔', content: '工作十年回来刷题，发现都不会了', mood: 'neutral' },
-            { author: '高中生', content: '晚自习偷偷刷题，班主任在后面站了十分钟...', mood: 'angry' },
-            { author: '大学生', content: '逃课刷题被点名了，救命！', mood: 'angry' },
-            { author: '研究生', content: '导师问我为什么天天看代码，我说在搞科研', mood: 'happy' },
-            { author: '打工人', content: '下班刷题被女朋友骂了，OI和女朋友选哪个？', mood: 'neutral' },
-            { author: '网瘾少年', content: '自从开始刷题，游戏都不香了', mood: 'happy' },
-            { author: '键盘侠', content: '这平台UI不错，就是有点卡', mood: 'neutral' },
-            { author: '欧皇', content: '今天抽奖中了VIP，美滋滋', mood: 'happy' },
-            { author: '非酋', content: '连续30把都没AC，心态炸了', mood: 'angry' },
-            { author: '教练', content: '你们这届是我带过最差的一届', mood: 'angry' },
-            { author: '队长', content: '战队招新，要求普及组以上，有意私聊', mood: 'neutral' },
-            { author: '萌妹纸', content: '有没有小姐姐一起刷题呀~', mood: 'happy' },
-            { author: '直男癌', content: '代码就是最好的女朋友', mood: 'neutral' },
-            { author: '哲学家', content: 'AC的本质是什么？是快乐还是痛苦？', mood: 'neutral' },
-            { author: '诗人', content: '夜深人静时，唯有键盘声相伴', mood: 'neutral' },
-            { author: '段子手', content: '我写代码的速度，取决于女朋友生气的时间', mood: 'happy' }
+    // ----- 初始化障碍物 -----
+    function initObstacles() {
+        return [
+            { id: 'o1', x: 350, y: 200, w: 80, h: 30, hp: 3, maxHp: 3, alive: true },
+            { id: 'o2', x: 400, y: 350, w: 80, h: 30, hp: 3, maxHp: 3, alive: true },
+            { id: 'o3', x: 200, y: 420, w: 30, h: 80, hp: 3, maxHp: 3, alive: true },
+            { id: 'o4', x: 580, y: 120, w: 30, h: 80, hp: 3, maxHp: 3, alive: true },
+            { id: 'o5', x: 120, y: 260, w: 30, h: 80, hp: 3, maxHp: 3, alive: true },
+            { id: 'o6', x: 650, y: 400, w: 30, h: 80, hp: 3, maxHp: 3, alive: true },
         ];
+    }
+    obstacles = initObstacles();
 
-        // 不文明用户评论（显示为星号）
-        const toxicComments = [
-            { author: '暴躁喷子', content: '********', mood: 'toxic' },
-            { author: '键盘侠', content: '************', mood: 'toxic' },
-            { author: '网络暴民', content: '******', mood: 'toxic' },
-            { author: '素质低下', content: '**********', mood: 'toxic' },
-            { author: '杠精', content: '****', mood: 'toxic' },
-            { author: '喷子一号', content: '***********', mood: 'toxic' },
-            { author: '网络喷子', content: '*****', mood: 'toxic' },
-            { author: '暴躁老哥', content: '************', mood: 'toxic' },
-            { author: '嘴臭王者', content: '**********', mood: 'toxic' },
-            { author: '节奏大师', content: '***********', mood: 'toxic' }
+    // ----- 创建玩家 -----
+    function createPlayer(id, x, y) {
+        return {
+            id: id,
+            x: x, y: y,
+            angle: 0,
+            hp: 3,
+            maxHp: 3,
+            alive: true,
+            color: COLORS[id % COLORS.length],
+            name: NAMES[id % NAMES.length] || `玩家${id}`,
+            radius: 16,
+            speed: 3.0,
+            shootCooldown: 0
+        };
+    }
+
+    // ----- 生成出生点 -----
+    function getSpawn(id) {
+        const spawns = [
+            { x: 150, y: 150 }, { x: 650, y: 150 },
+            { x: 150, y: 450 }, { x: 650, y: 450 },
+            { x: 400, y: 80 }, { x: 400, y: 520 },
+            { x: 80, y: 300 }, { x: 720, y: 300 }
         ];
+        return spawns[id % spawns.length];
+    }
 
-        // 生成随机ID
-        function generateId() {
-            return Date.now() + Math.random() * 10000;
-        }
+    // ----- 初始化本地玩家 -----
+    function initLocalPlayer(id) {
+        const spawn = getSpawn(id);
+        localPlayer = createPlayer(id, spawn.x, spawn.y);
+        players[id] = localPlayer;
+        myId = id;
+    }
 
-        // 主题切换 - 修复版
-        function toggleTheme() {
-            const body = document.body;
-            const toggleBtn = document.getElementById('themeToggle');
-            const icon = toggleBtn.querySelector('i');
-            const text = toggleBtn.querySelector('span');
-            
-            if (body.classList.contains('day-mode')) {
-                // 切换到黑夜模式
-                body.classList.remove('day-mode');
-                icon.className = 'fas fa-sun';
-                text.textContent = '白天模式';
-                localStorage.setItem('ojTheme', 'night');
-            } else {
-                // 切换到白天模式
-                body.classList.add('day-mode');
-                icon.className = 'fas fa-moon';
-                text.textContent = '黑夜模式';
-                localStorage.setItem('ojTheme', 'day');
+    // ----- 广播消息到所有连接 -----
+    function broadcast(data) {
+        const msg = JSON.stringify(data);
+        for (let conn of Object.values(connections)) {
+            if (conn.open) {
+                conn.send(msg);
             }
         }
+    }
 
-        // 加载保存的主题
-        function loadTheme() {
-            const savedTheme = localStorage.getItem('ojTheme');
-            const toggleBtn = document.getElementById('themeToggle');
-            const icon = toggleBtn.querySelector('i');
-            const text = toggleBtn.querySelector('span');
-            
-            if (savedTheme === 'day') {
-                document.body.classList.add('day-mode');
-                icon.className = 'fas fa-moon';
-                text.textContent = '黑夜模式';
-            } else {
-                document.body.classList.remove('day-mode');
-                icon.className = 'fas fa-sun';
-                text.textContent = '白天模式';
-            }
+    // ----- 发送给特定玩家 -----
+    function sendTo(peerId, data) {
+        const conn = connections[peerId];
+        if (conn && conn.open) {
+            conn.send(JSON.stringify(data));
         }
+    }
 
-        // 排行榜去重
-        function getUniqueHighestScores(rankingList) {
-            const userMap = new Map();
-            rankingList.forEach(record => {
-                const existing = userMap.get(record.username);
-                if (!existing || record.score > existing.score) {
-                    userMap.set(record.username, record);
+    // ----- 处理收到的消息 -----
+    function handleMessage(data, senderId) {
+        switch (data.type) {
+            case 'state':
+                // 完整状态同步 (主机发给客户端)
+                players = data.players || {};
+                bullets = data.bullets || [];
+                obstacles = data.obstacles || [];
+                gameRunning = data.gameRunning !== undefined ? data.gameRunning : true;
+                winnerId = data.winnerId || null;
+                // 保留自己的玩家对象
+                if (myId && players[myId]) {
+                    localPlayer = players[myId];
+                }
+                break;
+
+            case 'player_joined':
+                players[data.id] = data.player;
+                break;
+
+            case 'player_left':
+                delete players[data.id];
+                break;
+
+            case 'player_update':
+                if (players[data.id]) {
+                    Object.assign(players[data.id], data.player);
+                }
+                break;
+
+            case 'bullet_spawn':
+                bullets.push(data.bullet);
+                break;
+
+            case 'bullet_remove':
+                bullets = bullets.filter(b => b.id !== data.bulletId);
+                break;
+
+            case 'obstacle_damage':
+                for (let ob of obstacles) {
+                    if (ob.id === data.obstacleId) {
+                        ob.hp = data.hp;
+                        if (ob.hp <= 0) ob.alive = false;
+                        break;
+                    }
+                }
+                break;
+
+            case 'player_hit':
+                if (players[data.targetId]) {
+                    players[data.targetId].hp = data.hp;
+                    if (data.hp <= 0) {
+                        players[data.targetId].alive = false;
+                    }
+                }
+                break;
+
+            case 'game_over':
+                gameRunning = false;
+                winnerId = data.winnerId;
+                break;
+
+            case 'game_reset':
+                players = data.players || {};
+                bullets = [];
+                gameRunning = true;
+                winnerId = null;
+                obstacles = data.obstacles || [];
+                if (myId && players[myId]) {
+                    localPlayer = players[myId];
+                }
+                break;
+
+            case 'sync_request':
+                // 客户端请求完整状态
+                if (isHost) {
+                    sendTo(senderId, {
+                        type: 'state',
+                        players: players,
+                        bullets: bullets,
+                        obstacles: obstacles,
+                        gameRunning: gameRunning,
+                        winnerId: winnerId
+                    });
+                }
+                break;
+
+            default:
+                console.log('未知消息:', data.type);
+        }
+    }
+
+    // ----- 创建房间 (主机) -----
+    function createRoom() {
+        if (peer) peer.destroy();
+        peer = new Peer({
+            debug: 2
+        });
+
+        peer.on('open', (id) => {
+            myId = id;
+            isHost = true;
+            initLocalPlayer(0);
+            obstacles = initObstacles();
+            gameRunning = true;
+            winnerId = null;
+            bullets = [];
+            statusDisplay.innerHTML = `🟢 <span class="online">主机 ${id}</span>`;
+            updateUI();
+            console.log('🎯 房间创建成功，ID:', id);
+            document.getElementById('peerIdInput').value = id;
+        });
+
+        peer.on('connection', (conn) => {
+            console.log('📞 新连接:', conn.peer);
+            connections[conn.peer] = conn;
+            conn.on('data', (data) => {
+                try {
+                    const msg = JSON.parse(data);
+                    handleMessage(msg, conn.peer);
+                    // 转发给其他客户端 (如果是主机)
+                    if (isHost) {
+                        // 检查是否是移动/射击消息，需要转发
+                        if (msg.type === 'player_update' || msg.type === 'bullet_spawn') {
+                            broadcast(data);
+                        }
+                    }
+                } catch (e) {
+                    console.warn('消息解析错误', e);
                 }
             });
-            return Array.from(userMap.values()).sort((a, b) => b.score - a.score);
-        }
-
-        function addToRankings(newRecord) {
-            rankings = rankings.filter(r => r.username !== newRecord.username);
-            rankings.push(newRecord);
-            rankings.sort((a, b) => b.score - a.score);
-            if (rankings.length > 50) rankings.pop();
-            localStorage.setItem('ojRankings', JSON.stringify(rankings));
-        }
-
-        // 初始化
-        function init() {
-            const savedUsers = localStorage.getItem('ojUsers');
-            if (savedUsers) users = JSON.parse(savedUsers);
-            const savedRankings = localStorage.getItem('ojRankings');
-            if (savedRankings) {
-                rankings = JSON.parse(savedRankings);
-                rankings = getUniqueHighestScores(rankings);
-            }
-            const savedUser = localStorage.getItem('ojCurrentUser');
-            if (savedUser && users[savedUser]) {
-                currentUser = savedUser;
-                document.getElementById('usernameDisplay').textContent = currentUser;
-            }
-            loadTheme();
-            updateRankings();
-        }
-
-        // 显示游戏界面
-        function showGameInterface() {
-            if (!currentUser) {
-                document.getElementById('loginModal').classList.add('active');
-            } else if (!users[currentUser].gameState) {
-                document.getElementById('setupModal').classList.add('active');
-            } else {
-                gameState = users[currentUser].gameState;
-                document.getElementById('welcomePage').style.display = 'none';
-                document.getElementById('gameHall').style.display = 'block';
-                document.getElementById('usernameDisplay').textContent = currentUser;
-                updateMaintenanceTip();
-                updateTeamButtons();
-                updateProblemWarning();
-                updateToxicWarning();
+            conn.on('close', () => {
+                delete connections[conn.peer];
+                if (isHost) {
+                    // 通知所有人有人离开
+                    broadcast({ type: 'player_left', id: conn.peer });
+                }
                 updateUI();
-                startTimer();
-            }
-        }
+            });
 
-        // 登录注册
-        function showRegister() {
-            document.getElementById('loginModal').classList.remove('active');
-            document.getElementById('registerModal').classList.add('active');
-        }
-
-        function backToLogin() {
-            document.getElementById('registerModal').classList.remove('active');
-            document.getElementById('loginModal').classList.add('active');
-        }
-
-        function handleRegister() {
-            const username = document.getElementById('regUsername').value.trim();
-            const password = document.getElementById('regPassword').value;
-            const confirm = document.getElementById('regConfirm').value;
-            if (!username || !password) { alert('请填写完整'); return; }
-            if (password !== confirm) { alert('密码不一致'); return; }
-            if (users[username]) { alert('用户名已存在'); return; }
-            users[username] = { password: password, gameState: null };
-            localStorage.setItem('ojUsers', JSON.stringify(users));
-            alert('注册成功，请登录');
-            backToLogin();
-        }
-
-        function handleLogin() {
-            const username = document.getElementById('loginUsername').value.trim();
-            const password = document.getElementById('loginPassword').value;
-            if (!users[username] || users[username].password !== password) {
-                alert('用户名或密码错误');
-                return;
-            }
-            currentUser = username;
-            localStorage.setItem('ojCurrentUser', username);
-            document.getElementById('loginModal').classList.remove('active');
-            if (users[currentUser].gameState) {
-                gameState = users[currentUser].gameState;
-                document.getElementById('welcomePage').style.display = 'none';
-                document.getElementById('gameHall').style.display = 'block';
-                document.getElementById('usernameDisplay').textContent = username;
-                updateMaintenanceTip();
-                updateTeamButtons();
-                updateProblemWarning();
-                updateToxicWarning();
+            // 如果是主机，发送当前状态给新客户端
+            if (isHost) {
+                // 先把新玩家加入
+                const newPlayer = createPlayer(Object.keys(players).length, getSpawn(Object.keys(players).length));
+                players[newPlayer.id] = newPlayer;
+                broadcast({ type: 'player_joined', id: newPlayer.id, player: newPlayer });
+                // 发送完整状态
+                sendTo(conn.peer, {
+                    type: 'state',
+                    players: players,
+                    bullets: bullets,
+                    obstacles: obstacles,
+                    gameRunning: gameRunning,
+                    winnerId: winnerId
+                });
                 updateUI();
-                startTimer();
-            } else {
-                document.getElementById('setupModal').classList.add('active');
+            }
+        });
+
+        peer.on('error', (err) => {
+            console.error('Peer 错误:', err);
+            statusDisplay.innerHTML = '🔴 <span class="offline">错误: ' + err.message + '</span>';
+        });
+    }
+
+    // ----- 连接房间 (客户端) -----
+    function joinRoom(hostId) {
+        if (peer) peer.destroy();
+        peer = new Peer({
+            debug: 2
+        });
+
+        peer.on('open', (id) => {
+            myId = id;
+            isHost = false;
+            initLocalPlayer(1); // 临时ID，等待主机分配
+            statusDisplay.innerHTML = `🟡 <span class="online">连接中...</span>`;
+            console.log('🔗 本地ID:', id);
+
+            const conn = peer.connect(hostId);
+            conn.on('open', () => {
+                connections[hostId] = conn;
+                statusDisplay.innerHTML = `🟢 <span class="online">已连接 ${hostId}</span>`;
+                console.log('✅ 已连接到主机');
+                // 请求同步
+                sendTo(hostId, { type: 'sync_request' });
+            });
+
+            conn.on('data', (data) => {
+                try {
+                    const msg = JSON.parse(data);
+                    handleMessage(msg, hostId);
+                    // 更新本地玩家ID (如果主机分配了)
+                    if (msg.type === 'state' && msg.players && myId) {
+                        if (!msg.players[myId] && localPlayer) {
+                            // 主机可能分配了新ID，寻找匹配
+                            for (let id in msg.players) {
+                                if (msg.players[id].name === localPlayer.name && !players[id]) {
+                                    // 重新映射
+                                    const oldId = myId;
+                                    myId = id;
+                                    players[id] = localPlayer;
+                                    delete players[oldId];
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.warn('消息解析错误', e);
+                }
+            });
+
+            conn.on('close', () => {
+                delete connections[hostId];
+                statusDisplay.innerHTML = '🔴 <span class="offline">与主机断开</span>';
+                console.log('❌ 与主机断开');
+            });
+        });
+
+        peer.on('error', (err) => {
+            console.error('Peer 错误:', err);
+            statusDisplay.innerHTML = '🔴 <span class="offline">连接失败: ' + err.message + '</span>';
+        });
+    }
+
+    // ----- 发送本地更新 -----
+    function sendLocalUpdate() {
+        if (!localPlayer || !myId) return;
+        if (!localPlayer.alive) return;
+
+        // 移动
+        let dx = 0, dy = 0;
+        if (keys['w'] || keys['arrowup']) dy -= 1;
+        if (keys['s'] || keys['arrowdown']) dy += 1;
+        if (keys['a'] || keys['arrowleft']) dx -= 1;
+        if (keys['d'] || keys['arrowright']) dx += 1;
+
+        const angle = Math.atan2(mouseY - localPlayer.y, mouseX - localPlayer.x);
+        localPlayer.angle = angle;
+
+        if (dx !== 0 || dy !== 0) {
+            const len = Math.hypot(dx, dy);
+            localPlayer.x += (dx / len) * localPlayer.speed;
+            localPlayer.y += (dy / len) * localPlayer.speed;
+            // 边界
+            localPlayer.x = Math.max(localPlayer.radius, Math.min(800 - localPlayer.radius, localPlayer.x));
+            localPlayer.y = Math.max(localPlayer.radius, Math.min(600 - localPlayer.radius, localPlayer.y));
+        }
+
+        // 障碍物碰撞
+        for (let ob of obstacles) {
+            if (!ob.alive) continue;
+            const cx = localPlayer.x, cy = localPlayer.y, r = localPlayer.radius;
+            const nearX = Math.max(ob.x, Math.min(cx, ob.x + ob.w));
+            const nearY = Math.max(ob.y, Math.min(cy, ob.y + ob.h));
+            const ddx = cx - nearX;
+            const ddy = cy - nearY;
+            if (ddx * ddx + ddy * ddy < r * r) {
+                const ang = Math.atan2(ddy, ddx);
+                const overlap = r - Math.hypot(ddx, ddy);
+                localPlayer.x += Math.cos(ang) * overlap;
+                localPlayer.y += Math.sin(ang) * overlap;
             }
         }
 
-        function logout() {
-            currentUser = null;
-            localStorage.removeItem('ojCurrentUser');
-            if (timerInterval) clearInterval(timerInterval);
-            document.getElementById('gameHall').style.display = 'none';
-            document.getElementById('welcomePage').style.display = 'block';
-        }
+        // 射击冷却
+        if (localPlayer.shootCooldown > 0) localPlayer.shootCooldown--;
 
-        // 开局
-        function startNewGame() {
-            const platform = document.getElementById('setupPlatform').value;
-            const money = parseInt(document.getElementById('setupMoney').value);
-            const userCount = parseInt(document.getElementById('setupUsers').value);
-            if (money < 10000 || money > 100000 || userCount < 1000 || userCount > 5000) {
-                alert('请确保资金在10000-100000之间，用户数在1000-5000之间');
-                return;
-            }
-            
-            const initialForum = [];
-            // 添加8条正常评论
-            for (let i = 0; i < 8; i++) {
-                const randomComment = forumComments[Math.floor(Math.random() * forumComments.length)];
-                initialForum.push({
-                    id: generateId(),
-                    author: randomComment.author,
-                    content: randomComment.content,
-                    mood: randomComment.mood,
-                    day: 1,
-                    isToxic: false
-                });
-            }
-            // 添加2条不文明评论
-            for (let i = 0; i < 2; i++) {
-                const randomToxic = toxicComments[Math.floor(Math.random() * toxicComments.length)];
-                initialForum.push({
-                    id: generateId(),
-                    author: randomToxic.author,
-                    content: randomToxic.content,
-                    mood: 'toxic',
-                    day: 1,
-                    isToxic: true
-                });
-            }
-            
-            gameState = {
-                day: 1,
-                money: money,
-                users: userCount,
-                vipCount: 0,
-                platformName: platform,
-                contests: [],
-                problems: [],
-                teams: [],
-                teamMatches: [],
-                news: [{ text: '🎉 平台正式上线！', day: 1 }],
-                forum: initialForum,
-                recharges: [],
-                rechargeTotal: 0,
-                vipIncome: 0,
-                toxicCount: 2,
-                bannedCount: 0,
-                wrongBans: 0
+        // 射击
+        if (mousePressed && localPlayer.shootCooldown === 0 && localPlayer.alive) {
+            const bullet = {
+                id: Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+                ownerId: myId,
+                x: localPlayer.x + Math.cos(angle) * 20,
+                y: localPlayer.y + Math.sin(angle) * 20,
+                vx: Math.cos(angle) * 8,
+                vy: Math.sin(angle) * 8,
+                radius: 5,
+                life: 70,
+                damage: 1
             };
-            
-            users[currentUser].gameState = gameState;
-            localStorage.setItem('ojUsers', JSON.stringify(users));
-            
-            document.getElementById('setupModal').classList.remove('active');
-            document.getElementById('welcomePage').style.display = 'none';
-            document.getElementById('gameHall').style.display = 'block';
-            document.getElementById('usernameDisplay').textContent = currentUser;
-            updateMaintenanceTip();
-            updateTeamButtons();
-            updateProblemWarning();
-            updateToxicWarning();
-            updateUI();
-            startTimer();
+            bullets.push(bullet);
+            localPlayer.shootCooldown = 14;
+            // 广播子弹
+            broadcast({ type: 'bullet_spawn', bullet: bullet });
+            mousePressed = false; // 单次触发
         }
 
-        // 封禁用户 - 每个用户都有封禁按钮
-        function banUser(postId) {
-            if (!gameState) return;
-            const post = gameState.forum.find(p => p.id === postId);
-            if (!post) return;
-            
-            // 从列表中移除该帖子
-            gameState.forum = gameState.forum.filter(p => p.id !== postId);
-            
-            if (post.isToxic) {
-                // 正确封禁
-                gameState.toxicCount = Math.max(0, (gameState.toxicCount || 0) - 1);
-                gameState.bannedCount = (gameState.bannedCount || 0) + 1;
-                gameState.news.push({ 
-                    text: `✅ 成功封禁不文明用户「${post.author}」，社区环境改善`, 
-                    day: gameState.day,
-                    type: 'positive'
-                });
-                // 增加用户好感
-                gameState.users = Math.floor(gameState.users * 1.02);
+        // 广播玩家更新
+        broadcast({
+            type: 'player_update',
+            id: myId,
+            player: {
+                x: localPlayer.x,
+                y: localPlayer.y,
+                angle: localPlayer.angle,
+                hp: localPlayer.hp,
+                alive: localPlayer.alive
+            }
+        });
+    }
+
+    // ----- 更新子弹 (主机) -----
+    function updateBullets() {
+        if (!isHost) return;
+
+        for (let i = bullets.length - 1; i >= 0; i--) {
+            const b = bullets[i];
+            b.x += b.vx;
+            b.y += b.vy;
+            b.life--;
+
+            if (b.x < 0 || b.x > 800 || b.y < 0 || b.y > 600 || b.life <= 0) {
+                bullets.splice(i, 1);
+                broadcast({ type: 'bullet_remove', bulletId: b.id });
+                continue;
+            }
+
+            let used = false;
+            // 障碍物碰撞
+            for (let ob of obstacles) {
+                if (!ob.alive) continue;
+                if (b.x > ob.x && b.x < ob.x + ob.w && b.y > ob.y && b.y < ob.y + ob.h) {
+                    ob.hp--;
+                    if (ob.hp <= 0) ob.alive = false;
+                    broadcast({ type: 'obstacle_damage', obstacleId: ob.id, hp: ob.hp });
+                    used = true;
+                    break;
+                }
+            }
+            if (used) {
+                bullets.splice(i, 1);
+                broadcast({ type: 'bullet_remove', bulletId: b.id });
+                continue;
+            }
+
+            // 玩家碰撞
+            for (let p of Object.values(players)) {
+                if (!p.alive || p.id === b.ownerId) continue;
+                const dx = p.x - b.x;
+                const dy = p.y - b.y;
+                if (dx * dx + dy * dy < (p.radius + b.radius) * (p.radius + b.radius)) {
+                    p.hp -= b.damage || 1;
+                    if (p.hp <= 0) {
+                        p.alive = false;
+                        p.hp = 0;
+                    }
+                    broadcast({ type: 'player_hit', targetId: p.id, hp: p.hp });
+                    used = true;
+                    break;
+                }
+            }
+            if (used) {
+                bullets.splice(i, 1);
+                broadcast({ type: 'bullet_remove', bulletId: b.id });
+            }
+        }
+
+        // 检查游戏结束
+        const alive = Object.values(players).filter(p => p.alive);
+        if (alive.length <= 1 && gameRunning) {
+            gameRunning = false;
+            winnerId = alive.length === 1 ? alive[0].id : null;
+            broadcast({ type: 'game_over', winnerId: winnerId });
+        }
+    }
+
+    // ----- UI 更新 -----
+    function updateUI() {
+        const count = Object.keys(players).length;
+        playerList.textContent = `👥 ${count} 人`;
+        if (winnerId !== null && players[winnerId]) {
+            document.getElementById('winnerDisplay')?.remove();
+            // 不做额外处理
+        }
+    }
+
+    // ----- 绘图 -----
+    function draw() {
+        ctx.clearRect(0, 0, 800, 600);
+
+        // 背景
+        ctx.strokeStyle = '#2a5468';
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 800; i += 40) {
+            ctx.beginPath();
+            ctx.moveTo(i, 0);
+            ctx.lineTo(i, 600);
+            ctx.strokeStyle = '#26505f';
+            ctx.stroke();
+        }
+        for (let i = 0; i < 600; i += 40) {
+            ctx.beginPath();
+            ctx.moveTo(0, i);
+            ctx.lineTo(800, i);
+            ctx.strokeStyle = '#26505f';
+            ctx.stroke();
+        }
+
+        // 障碍物
+        for (let ob of obstacles) {
+            if (!ob.alive) continue;
+            const alpha = 0.5 + 0.5 * (ob.hp / ob.maxHp);
+            ctx.fillStyle = `rgba(90, 130, 150, ${alpha})`;
+            ctx.shadowColor = '#aaccdd';
+            ctx.shadowBlur = 8;
+            ctx.fillRect(ob.x, ob.y, ob.w, ob.h);
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = '#b8d8e8';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(ob.x, ob.y, ob.w, ob.h);
+            if (ob.hp > 0) {
+                ctx.fillStyle = '#c8e6f0';
+                ctx.font = '10px monospace';
+                ctx.fillText('🛡️'.repeat(ob.hp), ob.x + 4, ob.y + 14);
+            }
+        }
+
+        // 子弹
+        for (let b of bullets) {
+            ctx.beginPath();
+            ctx.arc(b.x, b.y, b.radius || 5, 0, 2 * Math.PI);
+            ctx.fillStyle = '#ffdd77';
+            ctx.shadowColor = '#ffbb33';
+            ctx.shadowBlur = 18;
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+
+        // 玩家
+        for (let id in players) {
+            const p = players[id];
+            if (!p.alive) {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 16, 0, 2 * Math.PI);
+                ctx.fillStyle = '#334455';
+                ctx.fill();
+                ctx.fillStyle = '#667788';
+                ctx.font = '20px sans-serif';
+                ctx.fillText('💀', p.x - 14, p.y + 8);
+                continue;
+            }
+
+            ctx.shadowColor = '#00000055';
+            ctx.shadowBlur = 14;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 16, 0, 2 * Math.PI);
+            ctx.fillStyle = p.color || COLORS[id % COLORS.length];
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2.5;
+            ctx.stroke();
+
+            ctx.shadowBlur = 0;
+            const angle = p.angle || 0;
+            const tipX = p.x + Math.cos(angle) * 26;
+            const tipY = p.y + Math.sin(angle) * 26;
+            ctx.beginPath();
+            ctx.moveTo(p.x + Math.cos(angle) * 6, p.y + Math.sin(angle) * 6);
+            ctx.lineTo(tipX, tipY);
+            ctx.strokeStyle = '#1a1a2c';
+            ctx.lineWidth = 5;
+            ctx.stroke();
+            ctx.strokeStyle = '#f0f0f0';
+            ctx.lineWidth = 2.5;
+            ctx.stroke();
+
+            ctx.fillStyle = '#fff6d0';
+            ctx.font = 'bold 15px monospace';
+            ctx.shadowBlur = 8;
+            ctx.shadowColor = '#000';
+            ctx.fillText('❤️'.repeat(Math.max(0, p.hp)), p.x - 18, p.y - 30);
+            ctx.fillStyle = '#e0f0ff';
+            ctx.font = 'bold 12px sans-serif';
+            ctx.fillText(p.name || `玩家${id}`, p.x - 20, p.y - 50);
+            ctx.shadowBlur = 0;
+        }
+
+        // 鼠标准星
+        if (localPlayer && localPlayer.alive) {
+            ctx.beginPath();
+            ctx.arc(mouseX, mouseY, 6, 0, 2 * Math.PI);
+            ctx.fillStyle = '#ffdd88';
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = '#ffaa33';
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.beginPath();
+            ctx.moveTo(mouseX - 14, mouseY);
+            ctx.lineTo(mouseX + 14, mouseY);
+            ctx.moveTo(mouseX, mouseY - 14);
+            ctx.lineTo(mouseX, mouseY + 14);
+            ctx.strokeStyle = '#ffe066';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+
+        // 游戏结束
+        if (!gameRunning) {
+            ctx.fillStyle = 'rgba(0,0,0,0.35)';
+            ctx.fillRect(0, 0, 800, 600);
+            ctx.font = 'bold 44px sans-serif';
+            ctx.fillStyle = '#ffe484';
+            ctx.shadowColor = '#000000';
+            ctx.shadowBlur = 20;
+            let msg = '💥 平局';
+            if (winnerId !== null && players[winnerId]) {
+                msg = `🏆 ${players[winnerId].name} 获胜！`;
+            }
+            ctx.fillText(msg, 200, 320);
+            ctx.shadowBlur = 0;
+        }
+
+        updateUI();
+    }
+
+    // ----- 游戏循环 -----
+    function gameLoop() {
+        if (localPlayer && localPlayer.alive) {
+            sendLocalUpdate();
+        }
+
+        if (isHost) {
+            updateBullets();
+        }
+
+        draw();
+        requestAnimationFrame(gameLoop);
+    }
+
+    // ----- 鼠标事件 -----
+    canvas.addEventListener('mousemove', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        mouseX = Math.min(800, Math.max(0, (e.clientX - rect.left) * scaleX));
+        mouseY = Math.min(600, Math.max(0, (e.clientY - rect.top) * scaleY));
+    });
+
+    canvas.addEventListener('mousedown', (e) => {
+        if (e.button === 0) {
+            e.preventDefault();
+            mousePressed = true;
+        }
+    });
+
+    canvas.addEventListener('mouseup', (e) => {
+        if (e.button === 0) {
+            e.preventDefault();
+            // 不重置，让 sendLocalUpdate 处理
+        }
+    });
+
+    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    // ----- 键盘 -----
+    document.addEventListener('keydown', (e) => {
+        const key = e.key.toLowerCase();
+        keys[key] = true;
+        if (['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright',' '].includes(key) || e.key === ' ') {
+            e.preventDefault();
+        }
+    });
+
+    document.addEventListener('keyup', (e) => {
+        const key = e.key.toLowerCase();
+        keys[key] = false;
+        if (['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright',' '].includes(key) || e.key === ' ') {
+            e.preventDefault();
+        }
+    });
+
+    window.addEventListener('blur', () => {
+        for (let k in keys) keys[k] = false;
+        mousePressed = false;
+    });
+
+    // ----- 按钮 -----
+    document.getElementById('createBtn').addEventListener('click', createRoom);
+    document.getElementById('connectBtn').addEventListener('click', () => {
+        const id = document.getElementById('peerIdInput').value.trim();
+        if (id) {
+            joinRoom(id);
+        } else {
+            alert('请输入对方的房间ID');
+        }
+    });
+
+    // 页面关闭时清理
+    window.addEventListener('beforeunload', () => {
+        if (peer) peer.destroy();
+    });
+
+    // 启动
+    console.log('🎮 P2P 联机枪战已启动');
+    console.log('💡 一人点击"创建房间"，另一人输入ID后点击"连接"');
+
+    // 添加胜者显示元素
+    const panel = document.querySelector('.panel');
+    const winnerEl = document.createElement('span');
+    winnerEl.id = 'winnerDisplay';
+    winnerEl.style.cssText = 'color:#f5d742;font-weight:bold;font-size:0.9rem;background:#102b38;padding:2px 14px;border-radius:30px;border:1px solid #2f6279;';
+    winnerEl.textContent = '🏆 -';
+    panel.appendChild(winnerEl);
+
+    // 每帧更新胜者显示
+    setInterval(() => {
+        const el = document.getElementById('winnerDisplay');
+        if (el) {
+            if (!gameRunning && winnerId !== null && players[winnerId]) {
+                el.textContent = `🏆 ${players[winnerId].name}`;
+            } else if (!gameRunning) {
+                el.textContent = '💥 平局';
             } else {
-                // 误封正常用户
-                gameState.wrongBans = (gameState.wrongBans || 0) + 1;
-                const loss = Math.floor(gameState.users * 0.05);
-                gameState.users = Math.max(0, gameState.users - loss);
-                gameState.news.push({ 
-                    text: `😡 误封正常用户「${post.author}」，导致 ${loss} 名用户离开`, 
-                    day: gameState.day,
-                    type: 'negative'
-                });
-            }
-            
-            saveGame();
-            updateToxicWarning();
-            updateUI();
-        }
-
-        // 更新战队按钮状态
-        function updateTeamButtons() {
-            if (!gameState) return;
-            const teamCount = gameState.teams.length;
-            const createBtn = document.getElementById('createTeamBtn');
-            const organizeBtn = document.getElementById('organizeMatchBtn');
-            const teamLimitTip = document.getElementById('teamLimitTip');
-            const teamCountDisplay = document.getElementById('teamCountDisplay');
-            teamLimitTip.textContent = `(${teamCount}/3)`;
-            if (teamCountDisplay) teamCountDisplay.textContent = `(${teamCount}/3)`;
-            createBtn.disabled = teamCount >= 3;
-            organizeBtn.disabled = teamCount < 2;
-        }
-
-        function updateProblemWarning() {
-            if (!gameState) return;
-            const problemCount = gameState.problems.length;
-            const warningElement = document.getElementById('problemWarning');
-            const problemCountTip = document.getElementById('problemCountTip');
-            if (problemCountTip) problemCountTip.textContent = `(${problemCount}道)`;
-            warningElement.style.display = problemCount < 5 ? 'inline-block' : 'none';
-        }
-
-        function updateToxicWarning() {
-            if (!gameState) return;
-            const warningElement = document.getElementById('toxicWarning');
-            const toxicCountDisplay = document.getElementById('toxicCountDisplay');
-            if (toxicCountDisplay) toxicCountDisplay.textContent = gameState.toxicCount || 0;
-            warningElement.style.display = gameState.toxicCount > 0 ? 'inline-block' : 'none';
-            if (gameState.toxicCount > 0) {
-                warningElement.textContent = `🤬 有不文明用户 (${gameState.toxicCount}人)`;
+                el.textContent = '⚡ 进行中';
             }
         }
+    }, 200);
 
-        function updateMaintenanceTip() {
-            if (!gameState) return;
-            const maintenanceFee = Math.floor(gameState.users / 4);
-            document.getElementById('maintenanceTip').textContent = `每日维护费: ¥${maintenanceFee}`;
-        }
-
-        // 计时器
-        function startTimer() {
-            if (timerInterval) clearInterval(timerInterval);
-            timeLeft = 60;
-            updateTimerDisplay();
-            timerInterval = setInterval(() => {
-                timeLeft--;
-                updateTimerDisplay();
-                if (timeLeft <= 0) {
-                    timeLeft = 60;
-                    endDay();
-                }
-            }, 1000);
-        }
-
-        function updateTimerDisplay() {
-            const timerElement = document.getElementById('timer');
-            if (timerElement) timerElement.textContent = timeLeft;
-        }
-
-        function forceEndDay() {
-            if (!gameState) return;
-            timeLeft = 60;
-            endDay();
-        }
-
-        // 每天结算 - 经营天数无上限
-        function endDay() {
-            if (!gameState) return;
-            
-            let userChange = 0;
-            let moneyChange = 0;
-            
-            // 维护费用
-            const maintenanceFee = Math.floor(gameState.users / 4);
-            moneyChange -= maintenanceFee;
-            
-            // 比赛影响
-            gameState.contests.forEach(c => {
-                if (c.day <= gameState.day && c.endDay >= gameState.day) {
-                    const attend = Math.floor(c.prize / 20) + 10;
-                    c.attendees = (c.attendees || 0) + attend;
-                    userChange += attend;
-                }
-            });
-            
-            // 题目影响
-            const problemCount = gameState.problems.length;
-            if (problemCount === 0) {
-                const loss = Math.floor(gameState.users * 0.15);
-                userChange -= loss;
-                gameState.news.push({ text: `😱 没有任何题目！用户大量流失 -${loss}人`, day: gameState.day });
-            } else if (problemCount < 3) {
-                const loss = Math.floor(gameState.users * 0.08);
-                userChange -= loss;
-                gameState.news.push({ text: `😟 题目太少，用户感到无聊 -${loss}人`, day: gameState.day });
-            } else if (problemCount < 5) {
-                const loss = Math.floor(gameState.users * 0.03);
-                userChange -= loss;
-                gameState.news.push({ text: `😐 题目不够丰富，部分用户离开 -${loss}人`, day: gameState.day });
-            } else if (problemCount < 10) {
-                const gain = Math.floor(gameState.users * 0.02);
-                userChange += gain;
-                gameState.news.push({ text: `📚 题库逐渐丰富，吸引 ${gain} 名新用户`, day: gameState.day });
-            } else {
-                const gain = Math.floor(gameState.users * 0.05);
-                userChange += gain;
-                gameState.news.push({ text: `🎯 海量题库！吸引 ${gain} 名新用户`, day: gameState.day });
-            }
-            
-            // 不文明用户影响
-            if (gameState.toxicCount > 0) {
-                const toxicLoss = gameState.toxicCount * Math.floor(gameState.users * 0.02);
-                userChange -= toxicLoss;
-                gameState.news.push({ text: `🤬 存在 ${gameState.toxicCount} 个不文明用户，导致 ${toxicLoss} 名用户离开`, day: gameState.day });
-            }
-            
-            // 充值
-            if (Math.random() > 0.6) {
-                const amount = Math.floor(Math.random() * 500) + 100;
-                moneyChange += amount;
-                gameState.rechargeTotal += amount;
-                gameState.recharges.push({ amount, day: gameState.day });
-                gameState.news.push({ text: `💰 用户充值 ¥${amount}`, day: gameState.day });
-            }
-            
-            // VIP开通
-            if (Math.random() > 0.7) {
-                const vipCount = Math.floor(Math.random() * 5) + 1;
-                const vipMoney = vipCount * 100;
-                gameState.vipCount += vipCount;
-                gameState.vipIncome += vipMoney;
-                moneyChange += vipMoney;
-                gameState.news.push({ text: `👑 ${vipCount}人开通VIP`, day: gameState.day });
-            }
-            
-            // 战队比赛奖金
-            gameState.teamMatches.forEach(m => {
-                if (m.day === gameState.day - 1 && m.winner) {
-                    moneyChange -= m.prize;
-                    gameState.news.push({ text: `🏆 ${m.winner}赢得奖金¥${m.prize}`, day: gameState.day });
-                }
-            });
-            
-            // 随机事件
-            if (Math.random() > 0.5) {
-                const gain = Math.floor(Math.random() * 100) + 50;
-                userChange += gain;
-                gameState.news.push({ text: `🎉 知名博主推荐 +${gain}用户`, day: gameState.day });
-            } else {
-                const loss = Math.floor(Math.random() * 80) + 20;
-                userChange -= loss;
-                gameState.news.push({ text: `😢 服务器波动 -${loss}用户`, day: gameState.day });
-            }
-            
-            // 添加新评论
-            for (let i = 0; i < 3; i++) {
-                if (Math.random() < 0.3) {
-                    const randomToxic = toxicComments[Math.floor(Math.random() * toxicComments.length)];
-                    gameState.forum.push({
-                        id: generateId(),
-                        author: randomToxic.author,
-                        content: randomToxic.content,
-                        mood: 'toxic',
-                        day: gameState.day,
-                        isToxic: true
-                    });
-                    gameState.toxicCount = (gameState.toxicCount || 0) + 1;
-                } else {
-                    const randomComment = forumComments[Math.floor(Math.random() * forumComments.length)];
-                    gameState.forum.push({
-                        id: generateId(),
-                        author: randomComment.author,
-                        content: randomComment.content,
-                        mood: randomComment.mood,
-                        day: gameState.day,
-                        isToxic: false
-                    });
-                }
-            }
-            
-            // 应用变化
-            gameState.users = Math.max(0, gameState.users + userChange);
-            gameState.money = Math.max(0, gameState.money + moneyChange);
-            
-            if (maintenanceFee > 0) {
-                gameState.news.push({ text: `💸 平台维护费用 -¥${maintenanceFee} (用户数的1/4)`, day: gameState.day });
-            }
-            
-            gameState.day++;
-            
-            saveGame();
-            updateMaintenanceTip();
-            updateTeamButtons();
-            updateProblemWarning();
-            updateToxicWarning();
-            updateUI();
-            checkGameOver();
-        }
-
-        // 创建战队
-        function showCreateTeamModal() {
-            if (!gameState) return;
-            if (gameState.teams.length >= 3) { alert('战队已达上限 (最多3个)'); return; }
-            if (300 > gameState.money) { alert('资金不足'); return; }
-            document.getElementById('createTeamModal').classList.add('active');
-        }
-
-        function closeCreateTeamModal() {
-            document.getElementById('createTeamModal').classList.remove('active');
-        }
-
-        function createTeamWithName() {
-            const teamName = document.getElementById('teamNameInput').value.trim();
-            if (gameState.teams.length >= 3) {
-                alert('战队已达上限 (最多3个)');
-                closeCreateTeamModal();
-                return;
-            }
-            if (!teamName) { alert('请输入战队名称'); return; }
-            gameState.money -= 300;
-            gameState.teams.push({
-                name: teamName,
-                strength: Math.floor(Math.random() * 100) + 50,
-                members: Math.floor(Math.random() * 15) + 5,
-                day: gameState.day
-            });
-            gameState.news.push({ text: `✨ 新战队 ${teamName} 成立`, day: gameState.day });
-            closeCreateTeamModal();
-            saveGame();
-            updateTeamButtons();
-            updateUI();
-        }
-
-        // 结算
-        function settleGame() {
-            if (!gameState) return;
-            const userScore = gameState.users;
-            const moneyScore = Math.floor(gameState.money / 10);
-            const vipScore = gameState.vipCount * 50;
-            const contestScore = gameState.contests.length * 20;
-            const problemScore = gameState.problems.length * 10;
-            const teamScore = gameState.teams.length * 30;
-            const bannedBonus = (gameState.bannedCount || 0) * 100;
-            const wrongBanPenalty = (gameState.wrongBans || 0) * 200;
-            const totalScore = userScore + moneyScore + vipScore + contestScore + problemScore + teamScore + bannedBonus - wrongBanPenalty;
-            
-            addToRankings({
-                username: currentUser,
-                score: Math.max(0, totalScore),
-                day: gameState.day,
-                platform: gameState.platformName,
-                users: gameState.users,
-                money: gameState.money,
-                vip: gameState.vipCount
-            });
-            
-            document.getElementById('settlementContent').innerHTML = `
-                <div class="score-item"><span>经营天数</span><span>${gameState.day} 天</span></div>
-                <div class="score-item"><span>最终用户</span><span>${gameState.users} 人 × 1 = ${userScore}</span></div>
-                <div class="score-item"><span>剩余资金</span><span>¥${gameState.money} ÷ 10 = ${moneyScore}</span></div>
-                <div class="score-item"><span>VIP数量</span><span>${gameState.vipCount} × 50 = ${vipScore}</span></div>
-                <div class="score-item"><span>举办比赛</span><span>${gameState.contests.length} × 20 = ${contestScore}</span></div>
-                <div class="score-item"><span>发布题目</span><span>${gameState.problems.length} × 10 = ${problemScore}</span></div>
-                <div class="score-item"><span>创建战队</span><span>${gameState.teams.length} × 30 = ${teamScore}</span></div>
-                <div class="score-item" style="color:#5cb85c;"><span>✅ 正确封禁</span><span>${gameState.bannedCount || 0} × 100 = +${bannedBonus}</span></div>
-                <div class="score-item" style="color:#d9534f;"><span>❌ 误封次数</span><span>${gameState.wrongBans || 0} × 200 = -${wrongBanPenalty}</span></div>
-                <div style="border-top: 2px solid #2c4058; margin: 1rem 0;"></div>
-                <div class="total-score">总分: ${Math.max(0, totalScore)}</div>
-            `;
-            document.getElementById('settlementModal').classList.add('active');
-            if (timerInterval) clearInterval(timerInterval);
-        }
-
-        function saveAndRestart() {
-            delete users[currentUser].gameState;
-            localStorage.setItem('ojUsers', JSON.stringify(users));
-            document.getElementById('settlementModal').classList.remove('active');
-            document.getElementById('gameHall').style.display = 'none';
-            document.getElementById('welcomePage').style.display = 'block';
-            document.getElementById('setupModal').classList.add('active');
-            gameState = null;
-        }
-
-        function closeSettlement() {
-            document.getElementById('settlementModal').classList.remove('active');
-            delete users[currentUser].gameState;
-            localStorage.setItem('ojUsers', JSON.stringify(users));
-            document.getElementById('gameHall').style.display = 'none';
-            document.getElementById('welcomePage').style.display = 'block';
-            gameState = null;
-        }
-
-        // 其他操作
-        function publishContest() {
-            const name = document.getElementById('contestName').value;
-            const prize = parseInt(document.getElementById('contestPrize').value);
-            const duration = parseInt(document.getElementById('contestDuration').value);
-            if (!name || prize < 10) { alert('请填写完整'); return; }
-            if (prize > gameState.money) { alert('资金不足'); return; }
-            gameState.money -= prize;
-            gameState.contests.push({ name, prize, duration, day: gameState.day, endDay: gameState.day + duration, attendees: 0 });
-            saveGame();
-            updateUI();
-        }
-
-        function publishProblem() {
-            const title = document.getElementById('problemTitle').value;
-            const difficulty = document.getElementById('problemDifficulty').value;
-            const costs = { '入门':30, '普及':50, '提高':80, '省选':120, 'NOI':200 };
-            const cost = costs[difficulty];
-            if (!title) { alert('请输入标题'); return; }
-            if (cost > gameState.money) { alert('资金不足'); return; }
-            gameState.money -= cost;
-            gameState.problems.push({ title, difficulty, day: gameState.day });
-            gameState.news.push({ text: `📝 新题发布：「${title}」(${difficulty})`, day: gameState.day });
-            saveGame();
-            updateProblemWarning();
-            updateUI();
-        }
-
-        function doAdvertising() {
-            const level = document.getElementById('adLevel').value;
-            let cost, min, max;
-            if (level === 'small') { cost=200; min=50; max=100; }
-            else if (level === 'medium') { cost=500; min=150; max=300; }
-            else { cost=1000; min=300; max=600; }
-            if (cost > gameState.money) { alert('资金不足'); return; }
-            gameState.money -= cost;
-            const gain = Math.floor(Math.random() * (max - min + 1)) + min;
-            gameState.users += gain;
-            gameState.news.push({ text: `📢 宣传 +${gain}用户`, day: gameState.day });
-            saveGame();
-            updateUI();
-        }
-
-        function promoteVIP() {
-            if (500 > gameState.money) { alert('资金不足'); return; }
-            gameState.money -= 500;
-            const newVIP = Math.floor(Math.random() * 10) + 5;
-            gameState.vipCount += newVIP;
-            gameState.news.push({ text: `👑 VIP推广 +${newVIP}人`, day: gameState.day });
-            saveGame();
-            updateUI();
-        }
-
-        function organizeTeamMatch() {
-            if (500 > gameState.money) { alert('资金不足'); return; }
-            if (gameState.teams.length < 2) { alert('至少需要2个战队才能组织比赛'); return; }
-            gameState.money -= 500;
-            const shuffled = [...gameState.teams].sort(() => 0.5 - Math.random());
-            const teamA = shuffled[0];
-            const teamB = shuffled[1];
-            const winner = Math.random() < 0.5 ? teamA.name : teamB.name;
-            const prize = Math.floor(Math.random() * 300) + 200;
-            gameState.teamMatches.push({ teamA: teamA.name, teamB: teamB.name, winner, prize, day: gameState.day });
-            gameState.news.push({ text: `⚔️ 组织比赛 ${teamA.name} VS ${teamB.name}`, day: gameState.day });
-            saveGame();
-            updateUI();
-        }
-
-        // UI更新
-        function updateUI() {
-            if (!gameState) return;
-            document.getElementById('moneyDisplay').textContent = gameState.money;
-            document.getElementById('usersDisplay').textContent = gameState.users;
-            document.getElementById('vipDisplay').textContent = gameState.vipCount;
-            
-            let contestHtml = '';
-            gameState.contests.slice(-5).forEach(c => { contestHtml += `<div class="list-item"><span>${c.name}</span><span>¥${c.prize}</span></div>`; });
-            document.getElementById('contestList').innerHTML = contestHtml || '<div class="list-item">暂无比赛</div>';
-            
-            let problemHtml = '';
-            gameState.problems.slice(-5).forEach(p => { problemHtml += `<div class="list-item"><span>${p.title}</span><span>${p.difficulty}</span></div>`; });
-            document.getElementById('problemList').innerHTML = problemHtml || '<div class="list-item">暂无题目</div>';
-            
-            let teamHtml = '';
-            gameState.teams.slice(-5).forEach(t => { teamHtml += `<div class="list-item"><span>${t.name}</span><span>⚔️ ${t.strength} | ${t.members}人</span></div>`; });
-            document.getElementById('teamList').innerHTML = teamHtml || '<div class="list-item">暂无战队</div>';
-            
-            let matchHtml = '';
-            gameState.teamMatches.slice(-5).forEach(m => { matchHtml += `<div class="list-item"><span>${m.teamA} VS ${m.teamB}</span><span>🏆 ${m.winner}</span></div>`; });
-            document.getElementById('teamMatchList').innerHTML = matchHtml || '<div class="list-item">暂无比赛</div>';
-            
-            // 讨论区 - 每个用户都有封禁按钮
-            let forumHtml = '';
-            [...gameState.forum].reverse().slice(0, 30).forEach(f => {
-                const moodClass = f.isToxic ? 'toxic' : (f.mood === 'happy' ? 'happy' : f.mood === 'angry' ? 'angry' : 'neutral');
-                const moodIcon = f.isToxic ? '🤬' : (f.mood === 'happy' ? '😊' : f.mood === 'angry' ? '😠' : '😐');
-                forumHtml += `
-                    <div class="forum-post ${moodClass}">
-                        <div class="post-header">
-                            <span class="post-author">${f.author}</span>
-                            <span class="post-time">第${f.day}天</span>
-                        </div>
-                        <div class="post-content">${moodIcon} ${f.content}</div>
-                        <div class="post-footer">
-                            <div class="post-tags">
-                                <span class="tag ${f.isToxic ? 'toxic-tag' : ''}">#${f.isToxic ? '不文明' : (f.mood === 'happy' ? '开心' : f.mood === 'angry' ? '暴躁' : '日常')}</span>
-                            </div>
-                            <button class="ban-btn" onclick="banUser(${f.id})">封禁</button>
-                        </div>
-                    </div>
-                `;
-            });
-            document.getElementById('forumList').innerHTML = forumHtml || '<div class="list-item">暂无讨论</div>';
-            
-            let newsHtml = '';
-            gameState.news.slice(-15).reverse().forEach(n => { newsHtml += `<div class="list-item"><span>第${n.day}天</span><span>${n.text}</span></div>`; });
-            document.getElementById('newsList').innerHTML = newsHtml || '<div class="list-item">暂无新闻</div>';
-            
-            updateTeamButtons();
-            updateProblemWarning();
-            updateToxicWarning();
-            updateRankings();
-        }
-
-        function updateRankings() {
-            const list = document.getElementById('rankingsList');
-            const gameList = document.getElementById('gameRankingsList');
-            const fullList = document.getElementById('fullRankingsList');
-            let html = '';
-            if (rankings.length === 0) {
-                html = '<div style="text-align:center; padding:2rem;">暂无上榜管理者</div>';
-            } else {
-                rankings.slice(0, 5).forEach((r, i) => {
-                    const rankClass = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : '';
-                    html += `<div class="rank-item ${rankClass}"><div class="rank-number">${i+1}</div><div style="flex:1">${r.username}</div><div>${r.score}分</div></div>`;
-                });
-            }
-            if (list) list.innerHTML = html;
-            if (gameList) gameList.innerHTML = html;
-            if (fullList) {
-                let fullHtml = '';
-                if (rankings.length === 0) {
-                    fullHtml = '<div style="text-align:center; padding:2rem;">暂无上榜管理者</div>';
-                } else {
-                    rankings.forEach((r, i) => {
-                        const rankClass = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : '';
-                        fullHtml += `<div class="rank-item ${rankClass}"><div class="rank-number">${i+1}</div><div style="flex:1">${r.username}</div><div>${r.score}分</div><div style="font-size:0.8rem; opacity:0.7;">第${r.day}天</div></div>`;
-                    });
-                }
-                fullList.innerHTML = fullHtml;
-            }
-            if (currentUser) {
-                const myRank = rankings.findIndex(r => r.username === currentUser) + 1;
-                const display = myRank ? `第${myRank}名` : '暂未上榜';
-                const rankDisplay = document.getElementById('myRankDisplay');
-                if (rankDisplay) rankDisplay.textContent = `我的排名: ${display}`;
-            }
-        }
-
-        function showFullRankings() {
-            updateRankings();
-            document.getElementById('rankingsModal').classList.add('active');
-        }
-
-        function closeRankingsModal() {
-            document.getElementById('rankingsModal').classList.remove('active');
-        }
-
-        function checkGameOver() {
-            if (gameState.money <= 0 || gameState.users <= 0) {
-                settleGame();
-            }
-        }
-
-        function saveGame() {
-            users[currentUser].gameState = gameState;
-            localStorage.setItem('ojUsers', JSON.stringify(users));
-            updateRankings();
-        }
-
-        init();
-    </script>
+    gameLoop();
+</script>
 </body>
 </html>
