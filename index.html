@@ -3,9 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🔫 局域网联机枪战 · 修复版</title>
+    <title>🔫 免费联机枪战 · 无需配置</title>
+    <script src="https://unpkg.com/peerjs@1.5.1/dist/peerjs.min.js"></script>
     <style>
-        * { box-sizing: border-box; user-select: none; }
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
         body {
             margin: 0;
             min-height: 100vh;
@@ -21,7 +25,7 @@
             padding: 18px 22px 22px;
             border-radius: 40px;
             border: 1px solid #3a7a94;
-            box-shadow: 0 20px 30px rgba(0,0,0,0.7);
+            box-shadow: 0 20px 30px rgba(0, 0, 0, 0.7);
             max-width: 880px;
             width: 100%;
         }
@@ -51,13 +55,21 @@
             border: 1px solid #2a6279;
             font-size: 0.8rem;
             font-weight: 600;
-            min-width: 120px;
+            min-width: 140px;
             text-align: center;
         }
-        .status.online { color: #6fcf97; }
-        .status.offline { color: #eb5757; }
-        .status.connecting { color: #f2c94c; }
-        .status.waiting { color: #8bc9e6; }
+        .status.online {
+            color: #6fcf97;
+        }
+        .status.offline {
+            color: #eb5757;
+        }
+        .status.connecting {
+            color: #f2c94c;
+        }
+        .status.waiting {
+            color: #8bc9e6;
+        }
         .btn {
             border: none;
             color: white;
@@ -68,13 +80,38 @@
             font-size: 0.85rem;
             transition: 0.15s;
         }
-        .btn-host { background: #27ae60; border: 1px solid #6fcf97; }
-        .btn-host:hover { background: #2ecc71; }
-        .btn-join { background: #4f8aa8; border: 1px solid #8bc9e6; }
-        .btn-join:hover { background: #5f9ab8; }
-        .btn-danger { background: #c74e3c; border: 1px solid #e6836e; }
-        .btn-danger:hover { background: #d85e4c; }
-        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-host {
+            background: #27ae60;
+            border: 1px solid #6fcf97;
+        }
+        .btn-host:hover {
+            background: #2ecc71;
+        }
+        .btn-join {
+            background: #4f8aa8;
+            border: 1px solid #8bc9e6;
+        }
+        .btn-join:hover {
+            background: #5f9ab8;
+        }
+        .btn-danger {
+            background: #c74e3c;
+            border: 1px solid #e6836e;
+        }
+        .btn-danger:hover {
+            background: #d85e4c;
+        }
+        .btn-copy {
+            background: #6c5ce7;
+            border: 1px solid #a29bfe;
+        }
+        .btn-copy:hover {
+            background: #7d6ff0;
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
         .input-group {
             display: flex;
             gap: 6px;
@@ -89,11 +126,16 @@
             border: none;
             color: #d4edff;
             padding: 4px 0;
-            width: 140px;
+            width: 150px;
             font-size: 0.85rem;
             outline: none;
         }
-        .input-group input::placeholder { color: #5a7a8a; }
+        .input-group input::placeholder {
+            color: #5a7a8a;
+        }
+        .input-group input:focus {
+            border-color: #4a8ba8;
+        }
         .stats {
             display: flex;
             gap: 14px;
@@ -103,8 +145,12 @@
             border: 1px solid #2a6279;
             font-size: 0.8rem;
         }
-        .stats span { color: #b3def5; }
-        .stats strong { color: #f5d742; }
+        .stats span {
+            color: #b3def5;
+        }
+        .stats strong {
+            color: #f5d742;
+        }
         .hint {
             color: #9ec3d6;
             font-size: 0.7rem;
@@ -120,501 +166,501 @@
             border-radius: 30px;
             border: 1px solid #2a6279;
         }
-        .hint .p1 { color: #f2c94c; }
-        .my-ip {
+        .hint .p1 {
+            color: #f2c94c;
+        }
+        .room-id {
             background: #0a2a38;
-            padding: 4px 12px;
+            padding: 4px 14px;
             border-radius: 30px;
             border: 1px solid #2a6279;
-            font-size: 0.75rem;
-            color: #6fcf97;
+            font-size: 0.8rem;
+            color: #f5d742;
+            font-weight: bold;
+            min-width: 100px;
+            text-align: center;
         }
-        @media (max-width: 600px) {
-            .panel { flex-direction: column; align-items: stretch; gap: 6px; }
-            .input-group { justify-content: center; }
-            .stats { justify-content: center; }
+        @media (max-width:600px) {
+            .panel {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 6px;
+            }
+            .input-group {
+                justify-content: center;
+            }
+            .stats {
+                justify-content: center;
+            }
         }
     </style>
 </head>
 <body>
-<div class="container">
-    <canvas id="gameCanvas" width="800" height="600"></canvas>
-    <div class="panel">
-        <div class="status offline" id="statusDisplay">⚪ 未连接</div>
-        <div class="input-group">
-            <input type="text" id="hostInput" placeholder="输入主机IP" value="">
-            <button class="btn btn-join" id="joinBtn">📥 加入</button>
-            <button class="btn btn-host" id="hostBtn">🚀 创建房间</button>
-            <button class="btn btn-danger" id="disconnectBtn">⛔ 断开</button>
+    <div class="container">
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        <div class="panel">
+            <div class="status offline" id="statusDisplay">⚪ 未连接</div>
+            <div class="input-group">
+                <input type="text" id="roomInput" placeholder="输入房间号" value="">
+                <button class="btn btn-join" id="joinBtn">📥 加入房间</button>
+                <button class="btn btn-host" id="hostBtn">🚀 创建房间</button>
+                <button class="btn btn-danger" id="disconnectBtn">⛔ 断开</button>
+            </div>
+            <div class="stats">
+                <span>🏆 <strong id="winnerDisplay">-</strong></span>
+                <span>👥 <strong id="playerCount">0</strong></span>
+            </div>
         </div>
-        <div class="stats">
-            <span>🏆 <strong id="winnerDisplay">-</strong></span>
-            <span>👥 <strong id="playerCount">0</strong></span>
+        <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px; margin-top:6px;">
+            <div class="room-id" id="roomIdDisplay">📋 房间号: 无</div>
+            <div class="hint">
+                <span class="p1">🟡 你: WASD + 空格/左键</span>
+                <span>❤️ 每人3条命</span>
+                <span>🧱 掩体可破坏</span>
+            </div>
         </div>
     </div>
-    <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px; margin-top:6px;">
-        <div class="my-ip" id="myIpDisplay">🖥️ 本机IP: 检测中...</div>
-        <div class="hint">
-            <span class="p1">🟡 你: WASD + 空格/左键</span>
-            <span>❤️ 每人3条命</span>
-            <span>🧱 掩体可破坏</span>
-        </div>
-    </div>
-</div>
 
-<script>
-    // ============================================================
-    //  🌐 局域网联机枪战 - 修复版
-    //  使用 WebRTC 直接连接，手动输入IP
-    // ============================================================
+    <script>
+        // ============================================================
+        //  🌐 免费联机枪战 - 使用 PeerJS 公共信令服务器
+        //  完全免费，无需任何配置！
+        // ============================================================
 
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
-    const statusDisplay = document.getElementById('statusDisplay');
-    const winnerSpan = document.getElementById('winnerDisplay');
-    const playerCountEl = document.getElementById('playerCount');
-    const myIpDisplay = document.getElementById('myIpDisplay');
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const statusDisplay = document.getElementById('statusDisplay');
+        const winnerSpan = document.getElementById('winnerDisplay');
+        const playerCountEl = document.getElementById('playerCount');
+        const roomIdDisplay = document.getElementById('roomIdDisplay');
 
-    // ----- 游戏状态 -----
-    let players = {};
-    let localPlayer = null;
-    let bullets = [];
-    let obstacles = [];
-    let gameRunning = true;
-    let winnerId = null;
-    let myId = null;
-    let isHost = false;
-    let isConnected = false;
+        // ----- 游戏状态 -----
+        let players = {};
+        let localPlayer = null;
+        let bullets = [];
+        let obstacles = [];
+        let gameRunning = true;
+        let winnerId = null;
+        let myId = null;
+        let isHost = false;
+        let isConnected = false;
 
-    // WebRTC 连接
-    let peerConnection = null;
-    let dataChannel = null;
-    let pendingCandidates = [];
+        // PeerJS
+        let peer = null;
+        let conn = null;
+        let roomId = '';
 
-    // ----- 玩家配置 -----
-    const COLORS = ['#f2c94c', '#eb5757', '#2f9bff', '#6fcf97', '#bb6bd9', '#f2994a'];
-    const SPAWNS = [
-        { x: 150, y: 150 }, { x: 650, y: 150 },
-        { x: 150, y: 450 }, { x: 650, y: 450 },
-        { x: 400, y: 80 }, { x: 400, y: 520 }
-    ];
-
-    const KEYMAP = [{ up: 'w', down: 's', left: 'a', right: 'd', fire: ' ' }];
-    const keys = {};
-    let mouseX = 400, mouseY = 300;
-    let mousePressed = false;
-    let lastShootTime = 0;
-
-    // ----- 工具函数 -----
-    function genId() {
-        return 'p' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
-    }
-
-    function createObstacles() {
-        return [
-            { id: 'o1', x: 350, y: 200, w: 80, h: 30, hp: 3, maxHp: 3, alive: true },
-            { id: 'o2', x: 400, y: 350, w: 80, h: 30, hp: 3, maxHp: 3, alive: true },
-            { id: 'o3', x: 200, y: 420, w: 30, h: 80, hp: 3, maxHp: 3, alive: true },
-            { id: 'o4', x: 580, y: 120, w: 30, h: 80, hp: 3, maxHp: 3, alive: true },
-            { id: 'o5', x: 120, y: 260, w: 30, h: 80, hp: 3, maxHp: 3, alive: true },
-            { id: 'o6', x: 650, y: 400, w: 30, h: 80, hp: 3, maxHp: 3, alive: true },
+        // ----- 玩家配置 -----
+        const COLORS = ['#f2c94c', '#eb5757', '#2f9bff', '#6fcf97', '#bb6bd9', '#f2994a'];
+        const SPAWNS = [
+            { x: 150, y: 150 },
+            { x: 650, y: 150 },
+            { x: 150, y: 450 },
+            { x: 650, y: 450 },
+            { x: 400, y: 80 },
+            { x: 400, y: 520 }
         ];
-    }
 
-    function createPlayer(id, x, y, name, color) {
-        return {
-            id: id,
-            x: x, y: y,
-            radius: 16,
-            speed: 3.2,
-            hp: 3,
-            maxHp: 3,
-            alive: true,
-            color: color || COLORS[Object.keys(players).length % COLORS.length],
-            name: name || `玩家${Object.keys(players).length + 1}`,
-            angle: 0,
-            shootCooldown: 0
-        };
-    }
+        const KEYMAP = [{ up: 'w', down: 's', left: 'a', right: 'd', fire: ' ' }];
+        const keys = {};
+        let mouseX = 400,
+            mouseY = 300;
+        let mousePressed = false;
 
-    function rectCircleCollide(rect, circle) {
-        const nearX = Math.max(rect.x, Math.min(circle.x, rect.x + rect.w));
-        const nearY = Math.max(rect.y, Math.min(circle.y, rect.y + rect.h));
-        const dx = circle.x - nearX;
-        const dy = circle.y - nearY;
-        return (dx * dx + dy * dy) < (circle.radius * circle.radius);
-    }
-
-    // ============================================================
-    //  获取本机IP
-    // ============================================================
-
-    function getLocalIP() {
-        const pc = new RTCPeerConnection({ iceServers: [] });
-        pc.createDataChannel('ip');
-        pc.createOffer().then(offer => pc.setLocalDescription(offer)).catch(() => {});
-        pc.onicecandidate = (e) => {
-            if (e.candidate) {
-                const ip = e.candidate.candidate.match(/(\d+\.\d+\.\d+\.\d+)/);
-                if (ip) {
-                    myIpDisplay.textContent = '🖥️ 本机IP: ' + ip[0];
-                    document.getElementById('hostInput').placeholder = '输入主机IP (如 ' + ip[0] + ')';
-                    pc.close();
-                }
-            }
-        };
-        setTimeout(() => pc.close(), 3000);
-    }
-    getLocalIP();
-
-    // ============================================================
-    //  游戏逻辑
-    // ============================================================
-
-    function initLocalGame() {
-        const id = genId();
-        myId = id;
-        const spawn = SPAWNS[0];
-        localPlayer = createPlayer(id, spawn.x, spawn.y, '我', COLORS[0]);
-        players = {};
-        players[id] = localPlayer;
-        obstacles = createObstacles();
-        bullets = [];
-        gameRunning = true;
-        winnerId = null;
-        updateUI();
-    }
-
-    function updateLocalPlayer() {
-        if (!localPlayer || !localPlayer.alive || !isConnected) return;
-
-        const k = KEYMAP[0];
-        let dx = 0, dy = 0;
-        if (keys[k.up]) dy -= 1;
-        if (keys[k.down]) dy += 1;
-        if (keys[k.left]) dx -= 1;
-        if (keys[k.right]) dx += 1;
-
-        const angle = Math.atan2(mouseY - localPlayer.y, mouseX - localPlayer.x);
-        localPlayer.angle = angle;
-
-        if (dx !== 0 || dy !== 0) {
-            const len = Math.hypot(dx, dy);
-            const moveX = (dx / len) * localPlayer.speed;
-            const moveY = (dy / len) * localPlayer.speed;
-
-            let newX = localPlayer.x + moveX;
-            let newY = localPlayer.y + moveY;
-            newX = Math.max(localPlayer.radius, Math.min(800 - localPlayer.radius, newX));
-            newY = Math.max(localPlayer.radius, Math.min(600 - localPlayer.radius, newY));
-
-            let blockedX = false, blockedY = false;
-            for (let ob of obstacles) {
-                if (!ob.alive) continue;
-                if (rectCircleCollide(ob, { x: newX, y: localPlayer.y, radius: localPlayer.radius })) blockedX = true;
-                if (rectCircleCollide(ob, { x: localPlayer.x, y: newY, radius: localPlayer.radius })) blockedY = true;
-            }
-            if (!blockedX) localPlayer.x = newX;
-            if (!blockedY) localPlayer.y = newY;
+        // ----- 工具函数 -----
+        function genId() {
+            return 'p' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
         }
 
-        if (localPlayer.shootCooldown > 0) localPlayer.shootCooldown--;
+        function createObstacles() {
+            return [
+                { id: 'o1', x: 350, y: 200, w: 80, h: 30, hp: 3, maxHp: 3, alive: true },
+                { id: 'o2', x: 400, y: 350, w: 80, h: 30, hp: 3, maxHp: 3, alive: true },
+                { id: 'o3', x: 200, y: 420, w: 30, h: 80, hp: 3, maxHp: 3, alive: true },
+                { id: 'o4', x: 580, y: 120, w: 30, h: 80, hp: 3, maxHp: 3, alive: true },
+                { id: 'o5', x: 120, y: 260, w: 30, h: 80, hp: 3, maxHp: 3, alive: true },
+                { id: 'o6', x: 650, y: 400, w: 30, h: 80, hp: 3, maxHp: 3, alive: true },
+            ];
+        }
 
-        // 射击：鼠标左键 或 空格
-        const shouldShoot = mousePressed || keys[k.fire];
-        if (shouldShoot && localPlayer.shootCooldown === 0) {
-            const angle2 = localPlayer.angle;
-            const bullet = {
-                id: genId(),
-                ownerId: myId,
-                x: localPlayer.x + Math.cos(angle2) * 22,
-                y: localPlayer.y + Math.sin(angle2) * 22,
-                vx: Math.cos(angle2) * 8.5,
-                vy: Math.sin(angle2) * 8.5,
-                radius: 5,
-                life: 65,
-                damage: 1
+        function createPlayer(id, x, y, name, color) {
+            return {
+                id: id,
+                x: x,
+                y: y,
+                radius: 16,
+                speed: 3.2,
+                hp: 3,
+                maxHp: 3,
+                alive: true,
+                color: color || COLORS[Object.keys(players).length % COLORS.length],
+                name: name || `玩家${Object.keys(players).length + 1}`,
+                angle: 0,
+                shootCooldown: 0
             };
-            bullets.push(bullet);
-            localPlayer.shootCooldown = 12;
-            // 发送子弹给另一端
-            sendData({ type: 'bullet_spawn', bullet: bullet });
-            mousePressed = false;
         }
 
-        // 发送玩家更新
-        sendData({
-            type: 'player_update',
-            player: {
-                id: myId,
-                x: localPlayer.x,
-                y: localPlayer.y,
-                angle: localPlayer.angle,
-                hp: localPlayer.hp,
-                alive: localPlayer.alive
-            }
-        });
-    }
-
-    function updateBullets() {
-        // 只有主机处理碰撞
-        if (!isHost) return;
-
-        for (let i = bullets.length - 1; i >= 0; i--) {
-            const b = bullets[i];
-            b.x += b.vx;
-            b.y += b.vy;
-            b.life--;
-
-            if (b.x < 0 || b.x > 800 || b.y < 0 || b.y > 600 || b.life <= 0) {
-                bullets.splice(i, 1);
-                sendData({ type: 'bullet_remove', bulletId: b.id });
-                continue;
-            }
-
-            let used = false;
-            for (let ob of obstacles) {
-                if (!ob.alive) continue;
-                if (b.x > ob.x && b.x < ob.x + ob.w && b.y > ob.y && b.y < ob.y + ob.h) {
-                    ob.hp--;
-                    if (ob.hp <= 0) ob.alive = false;
-                    sendData({ type: 'obstacle_damage', obstacleId: ob.id, hp: ob.hp });
-                    used = true;
-                    break;
-                }
-            }
-            if (used) {
-                bullets.splice(i, 1);
-                sendData({ type: 'bullet_remove', bulletId: b.id });
-                continue;
-            }
-
-            for (let p of Object.values(players)) {
-                if (!p.alive || p.id === b.ownerId) continue;
-                const dx = p.x - b.x;
-                const dy = p.y - b.y;
-                if (dx * dx + dy * dy < (p.radius + b.radius) * (p.radius + b.radius)) {
-                    p.hp -= b.damage;
-                    if (p.hp <= 0) {
-                        p.alive = false;
-                        p.hp = 0;
-                    }
-                    sendData({ type: 'player_hit', targetId: p.id, hp: p.hp });
-                    used = true;
-                    break;
-                }
-            }
-            if (used) {
-                bullets.splice(i, 1);
-                sendData({ type: 'bullet_remove', bulletId: b.id });
-            }
+        function rectCircleCollide(rect, circle) {
+            const nearX = Math.max(rect.x, Math.min(circle.x, rect.x + rect.w));
+            const nearY = Math.max(rect.y, Math.min(circle.y, rect.y + rect.h));
+            const dx = circle.x - nearX;
+            const dy = circle.y - nearY;
+            return (dx * dx + dy * dy) < (circle.radius * circle.radius);
         }
 
-        const alive = Object.values(players).filter(p => p.alive);
-        if (alive.length <= 1 && gameRunning) {
-            gameRunning = false;
-            winnerId = alive.length === 1 ? alive[0].id : null;
-            sendData({ type: 'game_over', winnerId: winnerId });
+        // ============================================================
+        //  游戏逻辑
+        // ============================================================
+
+        function initLocalGame() {
+            const id = genId();
+            myId = id;
+            const spawn = SPAWNS[0];
+            localPlayer = createPlayer(id, spawn.x, spawn.y, '我', COLORS[0]);
+            players = {};
+            players[id] = localPlayer;
+            obstacles = createObstacles();
+            bullets = [];
+            gameRunning = true;
+            winnerId = null;
             updateUI();
         }
-    }
 
-    // ============================================================
-    //  网络通信 (WebRTC)
-    // ============================================================
+        function updateLocalPlayer() {
+            if (!localPlayer || !localPlayer.alive || !isConnected) return;
 
-    const STUN_SERVERS = {
-        iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' }
-        ]
-    };
+            const k = KEYMAP[0];
+            let dx = 0,
+                dy = 0;
+            if (keys[k.up]) dy -= 1;
+            if (keys[k.down]) dy += 1;
+            if (keys[k.left]) dx -= 1;
+            if (keys[k.right]) dx += 1;
 
-    function sendData(data) {
-        if (dataChannel && dataChannel.readyState === 'open') {
-            dataChannel.send(JSON.stringify(data));
-        }
-    }
+            const angle = Math.atan2(mouseY - localPlayer.y, mouseX - localPlayer.x);
+            localPlayer.angle = angle;
 
-    function handlePeerMessage(data) {
-        switch (data.type) {
-            case 'player_info':
-                if (data.player && data.player.id !== myId) {
-                    if (!players[data.player.id]) {
-                        players[data.player.id] = createPlayer(
-                            data.player.id,
-                            data.player.x,
-                            data.player.y,
-                            data.player.name,
-                            data.player.color
-                        );
-                    }
-                    Object.assign(players[data.player.id], data.player);
-                    updateUI();
-                }
-                break;
-            case 'player_update':
-                if (data.player && data.player.id !== myId && players[data.player.id]) {
-                    Object.assign(players[data.player.id], data.player);
-                    updateUI();
-                }
-                break;
-            case 'bullet_spawn':
-                bullets.push(data.bullet);
-                break;
-            case 'bullet_remove':
-                bullets = bullets.filter(b => b.id !== data.bulletId);
-                break;
-            case 'player_hit':
-                if (players[data.targetId]) {
-                    players[data.targetId].hp = data.hp;
-                    if (data.hp <= 0) players[data.targetId].alive = false;
-                }
-                break;
-            case 'game_over':
-                gameRunning = false;
-                winnerId = data.winnerId;
-                updateUI();
-                break;
-            case 'obstacle_damage':
+            if (dx !== 0 || dy !== 0) {
+                const len = Math.hypot(dx, dy);
+                const moveX = (dx / len) * localPlayer.speed;
+                const moveY = (dy / len) * localPlayer.speed;
+
+                let newX = localPlayer.x + moveX;
+                let newY = localPlayer.y + moveY;
+                newX = Math.max(localPlayer.radius, Math.min(800 - localPlayer.radius, newX));
+                newY = Math.max(localPlayer.radius, Math.min(600 - localPlayer.radius, newY));
+
+                let blockedX = false,
+                    blockedY = false;
                 for (let ob of obstacles) {
-                    if (ob.id === data.obstacleId) {
-                        ob.hp = data.hp;
-                        if (ob.hp <= 0) ob.alive = false;
-                        break;
-                    }
+                    if (!ob.alive) continue;
+                    if (rectCircleCollide(ob, { x: newX, y: localPlayer.y, radius: localPlayer.radius })) blockedX =
+                    true;
+                    if (rectCircleCollide(ob, { x: localPlayer.x, y: newY, radius: localPlayer.radius })) blockedY =
+                    true;
                 }
-                break;
-            case 'sync_request':
-                if (isHost) {
-                    sendData({
-                        type: 'full_state',
-                        players: players,
-                        bullets: bullets,
-                        obstacles: obstacles,
-                        gameRunning: gameRunning,
-                        winnerId: winnerId
-                    });
-                }
-                break;
-            case 'full_state':
-                if (!isHost) {
-                    players = data.players || {};
-                    bullets = data.bullets || [];
-                    obstacles = data.obstacles || [];
-                    gameRunning = data.gameRunning !== undefined ? data.gameRunning : true;
-                    winnerId = data.winnerId || null;
-                    if (myId && players[myId]) {
-                        localPlayer = players[myId];
-                    }
-                    updateUI();
-                }
-                break;
-        }
-    }
+                if (!blockedX) localPlayer.x = newX;
+                if (!blockedY) localPlayer.y = newY;
+            }
 
-    // ============================================================
-    //  主机模式
-    // ============================================================
+            if (localPlayer.shootCooldown > 0) localPlayer.shootCooldown--;
 
-    function createHost() {
-        if (isConnected) disconnect();
+            const shouldShoot = mousePressed || keys[k.fire];
+            if (shouldShoot && localPlayer.shootCooldown === 0) {
+                const angle2 = localPlayer.angle;
+                const bullet = {
+                    id: genId(),
+                    ownerId: myId,
+                    x: localPlayer.x + Math.cos(angle2) * 22,
+                    y: localPlayer.y + Math.sin(angle2) * 22,
+                    vx: Math.cos(angle2) * 8.5,
+                    vy: Math.sin(angle2) * 8.5,
+                    radius: 5,
+                    life: 65,
+                    damage: 1
+                };
+                bullets.push(bullet);
+                localPlayer.shootCooldown = 12;
+                sendData({ type: 'bullet_spawn', bullet: bullet });
+                mousePressed = false;
+            }
 
-        initLocalGame();
-        isHost = true;
-        isConnected = true;
-        statusDisplay.className = 'status waiting';
-        statusDisplay.textContent = '🟡 等待连接...';
-
-        // 创建 WebRTC 连接 (等待客户端连接)
-        peerConnection = new RTCPeerConnection(STUN_SERVERS);
-
-        // 创建 DataChannel
-        dataChannel = peerConnection.createDataChannel('game');
-        dataChannel.onopen = () => {
-            statusDisplay.className = 'status online';
-            statusDisplay.textContent = '🟢 已连接 (主机)';
-            // 发送玩家信息
             sendData({
-                type: 'player_info',
+                type: 'player_update',
                 player: {
                     id: myId,
                     x: localPlayer.x,
                     y: localPlayer.y,
-                    color: localPlayer.color,
-                    name: localPlayer.name,
+                    angle: localPlayer.angle,
                     hp: localPlayer.hp,
                     alive: localPlayer.alive
                 }
             });
-        };
-        dataChannel.onmessage = (e) => {
-            try {
-                handlePeerMessage(JSON.parse(e.data));
-            } catch (err) { console.warn(err); }
-        };
-        dataChannel.onclose = () => {
-            statusDisplay.className = 'status offline';
-            statusDisplay.textContent = '🔴 连接断开';
-            isConnected = false;
-        };
-
-        peerConnection.onicecandidate = (e) => {
-            if (e.candidate) {
-                // 收集候选用
-            }
-        };
-
-        // 创建 Offer
-        peerConnection.createOffer()
-            .then(offer => peerConnection.setLocalDescription(offer))
-            .then(() => {
-                // 显示 Offer 给客户端
-                const offerData = {
-                    type: 'offer',
-                    sdp: peerConnection.localDescription
-                };
-                const encoded = btoa(JSON.stringify(offerData));
-                console.log('📋 信令数据(复制给客户端):', encoded);
-                // 弹出对话框方便复制
-                showSignalDialog('📋 复制以下数据给客户端', encoded);
-            });
-
-        document.getElementById('hostInput').value = '主机已创建';
-        updateUI();
-    }
-
-    // ============================================================
-    //  客户端模式
-    // ============================================================
-
-    function joinHost(hostIp) {
-        if (isConnected) disconnect();
-
-        // 客户端需要从主机获取信令数据
-        const signalInput = prompt('📋 请粘贴主机提供的信令数据:');
-        if (!signalInput) {
-            alert('需要信令数据才能连接');
-            return;
         }
 
-        try {
-            const signalData = JSON.parse(atob(signalInput));
+        function updateBullets() {
+            if (!isHost) return;
 
-            initLocalGame();
-            isHost = false;
-            isConnected = true;
-            statusDisplay.className = 'status connecting';
-            statusDisplay.textContent = '🟡 连接中...';
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                const b = bullets[i];
+                b.x += b.vx;
+                b.y += b.vy;
+                b.life--;
 
-            peerConnection = new RTCPeerConnection(STUN_SERVERS);
+                if (b.x < 0 || b.x > 800 || b.y < 0 || b.y > 600 || b.life <= 0) {
+                    bullets.splice(i, 1);
+                    sendData({ type: 'bullet_remove', bulletId: b.id });
+                    continue;
+                }
 
-            // 监听 DataChannel (客户端接收)
-            peerConnection.ondatachannel = (event) => {
-                dataChannel = event.channel;
-                dataChannel.onopen = () => {
+                let used = false;
+                for (let ob of obstacles) {
+                    if (!ob.alive) continue;
+                    if (b.x > ob.x && b.x < ob.x + ob.w && b.y > ob.y && b.y < ob.y + ob.h) {
+                        ob.hp--;
+                        if (ob.hp <= 0) ob.alive = false;
+                        sendData({ type: 'obstacle_damage', obstacleId: ob.id, hp: ob.hp });
+                        used = true;
+                        break;
+                    }
+                }
+                if (used) {
+                    bullets.splice(i, 1);
+                    sendData({ type: 'bullet_remove', bulletId: b.id });
+                    continue;
+                }
+
+                for (let p of Object.values(players)) {
+                    if (!p.alive || p.id === b.ownerId) continue;
+                    const dx = p.x - b.x;
+                    const dy = p.y - b.y;
+                    if (dx * dx + dy * dy < (p.radius + b.radius) * (p.radius + b.radius)) {
+                        p.hp -= b.damage;
+                        if (p.hp <= 0) {
+                            p.alive = false;
+                            p.hp = 0;
+                        }
+                        sendData({ type: 'player_hit', targetId: p.id, hp: p.hp });
+                        used = true;
+                        break;
+                    }
+                }
+                if (used) {
+                    bullets.splice(i, 1);
+                    sendData({ type: 'bullet_remove', bulletId: b.id });
+                }
+            }
+
+            const alive = Object.values(players).filter(p => p.alive);
+            if (alive.length <= 1 && gameRunning) {
+                gameRunning = false;
+                winnerId = alive.length === 1 ? alive[0].id : null;
+                sendData({ type: 'game_over', winnerId: winnerId });
+                updateUI();
+            }
+        }
+
+        // ============================================================
+        //  网络通信 (PeerJS)
+        // ============================================================
+
+        function sendData(data) {
+            if (conn && conn.open) {
+                conn.send(JSON.stringify(data));
+            }
+        }
+
+        function handlePeerMessage(data) {
+            switch (data.type) {
+                case 'player_info':
+                    if (data.player && data.player.id !== myId) {
+                        if (!players[data.player.id]) {
+                            players[data.player.id] = createPlayer(
+                                data.player.id,
+                                data.player.x,
+                                data.player.y,
+                                data.player.name,
+                                data.player.color
+                            );
+                        }
+                        Object.assign(players[data.player.id], data.player);
+                        updateUI();
+                    }
+                    break;
+                case 'player_update':
+                    if (data.player && data.player.id !== myId && players[data.player.id]) {
+                        Object.assign(players[data.player.id], data.player);
+                        updateUI();
+                    }
+                    break;
+                case 'bullet_spawn':
+                    bullets.push(data.bullet);
+                    break;
+                case 'bullet_remove':
+                    bullets = bullets.filter(b => b.id !== data.bulletId);
+                    break;
+                case 'player_hit':
+                    if (players[data.targetId]) {
+                        players[data.targetId].hp = data.hp;
+                        if (data.hp <= 0) players[data.targetId].alive = false;
+                    }
+                    break;
+                case 'game_over':
+                    gameRunning = false;
+                    winnerId = data.winnerId;
+                    updateUI();
+                    break;
+                case 'obstacle_damage':
+                    for (let ob of obstacles) {
+                        if (ob.id === data.obstacleId) {
+                            ob.hp = data.hp;
+                            if (ob.hp <= 0) ob.alive = false;
+                            break;
+                        }
+                    }
+                    break;
+                case 'sync_request':
+                    if (isHost) {
+                        sendData({
+                            type: 'full_state',
+                            players: players,
+                            bullets: bullets,
+                            obstacles: obstacles,
+                            gameRunning: gameRunning,
+                            winnerId: winnerId
+                        });
+                    }
+                    break;
+                case 'full_state':
+                    if (!isHost) {
+                        players = data.players || {};
+                        bullets = data.bullets || [];
+                        obstacles = data.obstacles || [];
+                        gameRunning = data.gameRunning !== undefined ? data.gameRunning : true;
+                        winnerId = data.winnerId || null;
+                        if (myId && players[myId]) {
+                            localPlayer = players[myId];
+                        }
+                        updateUI();
+                    }
+                    break;
+            }
+        }
+
+        // ============================================================
+        //  创建房间 (主机)
+        // ============================================================
+
+        function createRoom() {
+            if (isConnected) disconnect();
+
+            // 生成房间号 (4位数字)
+            roomId = String(Math.floor(1000 + Math.random() * 9000));
+            document.getElementById('roomInput').value = roomId;
+            roomIdDisplay.textContent = '📋 房间号: ' + roomId;
+
+            peer = new Peer(roomId, {
+                debug: 0
+            });
+
+            peer.on('open', (id) => {
+                console.log('✅ 房间创建成功，ID:', id);
+                initLocalGame();
+                isHost = true;
+                isConnected = true;
+                statusDisplay.className = 'status waiting';
+                statusDisplay.textContent = '🟡 等待加入... (房间 ' + roomId + ')';
+                updateUI();
+
+                // 提示其他人加入
+                alert('✅ 房间创建成功！\n房间号: ' + roomId + '\n让其他人输入这个房间号加入');
+            });
+
+            peer.on('connection', (incoming) => {
+                console.log('📞 有人连接:', incoming.peer);
+                conn = incoming;
+
+                conn.on('open', () => {
+                    console.log('✅ 连接已建立');
+                    statusDisplay.className = 'status online';
+                    statusDisplay.textContent = '🟢 已连接 (主机)';
+
+                    // 发送玩家信息
+                    sendData({
+                        type: 'player_info',
+                        player: {
+                            id: myId,
+                            x: localPlayer.x,
+                            y: localPlayer.y,
+                            color: localPlayer.color,
+                            name: localPlayer.name,
+                            hp: localPlayer.hp,
+                            alive: localPlayer.alive
+                        }
+                    });
+                });
+
+                conn.on('data', (data) => {
+                    try {
+                        handlePeerMessage(JSON.parse(data));
+                    } catch (e) { console.warn(e); }
+                });
+
+                conn.on('close', () => {
+                    console.log('❌ 连接断开');
+                    statusDisplay.className = 'status offline';
+                    statusDisplay.textContent = '🔴 连接断开';
+                    isConnected = false;
+                });
+            });
+
+            peer.on('error', (err) => {
+                console.error('Peer错误:', err);
+                if (err.type === 'unavailable-id') {
+                    alert('❌ 房间号已被占用，请重新创建');
+                    disconnect();
+                } else {
+                    statusDisplay.className = 'status offline';
+                    statusDisplay.textContent = '🔴 错误: ' + err.message;
+                }
+            });
+        }
+
+        // ============================================================
+        //  加入房间 (客户端)
+        // ============================================================
+
+        function joinRoom(roomIdToJoin) {
+            if (isConnected) disconnect();
+
+            roomId = roomIdToJoin.trim();
+            if (!roomId) {
+                alert('请输入房间号');
+                return;
+            }
+
+            roomIdDisplay.textContent = '📋 加入房间: ' + roomId;
+
+            peer = new Peer({
+                debug: 0
+            });
+
+            peer.on('open', (id) => {
+                console.log('✅ 本地ID:', id);
+                initLocalGame();
+                isHost = false;
+                isConnected = true;
+                statusDisplay.className = 'status connecting';
+                statusDisplay.textContent = '🟡 连接中...';
+
+                // 连接到主机
+                conn = peer.connect(roomId);
+
+                conn.on('open', () => {
+                    console.log('✅ 连接已建立');
                     statusDisplay.className = 'status online';
                     statusDisplay.textContent = '🟢 已连接 (客户端)';
+
                     // 发送玩家信息
                     sendData({
                         type: 'player_info',
@@ -630,367 +676,313 @@
                     });
                     // 请求完整状态
                     sendData({ type: 'sync_request' });
-                };
-                dataChannel.onmessage = (e) => {
+                });
+
+                conn.on('data', (data) => {
                     try {
-                        handlePeerMessage(JSON.parse(e.data));
-                    } catch (err) { console.warn(err); }
-                };
-                dataChannel.onclose = () => {
+                        handlePeerMessage(JSON.parse(data));
+                    } catch (e) { console.warn(e); }
+                });
+
+                conn.on('close', () => {
+                    console.log('❌ 连接断开');
                     statusDisplay.className = 'status offline';
                     statusDisplay.textContent = '🔴 连接断开';
                     isConnected = false;
-                };
-            };
-
-            peerConnection.onicecandidate = (e) => {
-                if (e.candidate) {
-                    // 发送候选回主机 (通过提示)
-                }
-            };
-
-            // 设置远程描述 (Offer)
-            peerConnection.setRemoteDescription(new RTCSessionDescription(signalData.sdp))
-                .then(() => peerConnection.createAnswer())
-                .then(answer => peerConnection.setLocalDescription(answer))
-                .then(() => {
-                    // 生成 Answer 数据
-                    const answerData = {
-                        type: 'answer',
-                        sdp: peerConnection.localDescription
-                    };
-                    const encoded = btoa(JSON.stringify(answerData));
-                    console.log('📋 回答数据(复制给主机):', encoded);
-                    showSignalDialog('📋 复制以下数据给主机', encoded);
                 });
+            });
 
-        } catch (e) {
-            console.error('加入失败', e);
-            alert('连接失败: ' + e.message);
-            statusDisplay.className = 'status offline';
-            statusDisplay.textContent = '🔴 连接失败';
-            isConnected = false;
+            peer.on('error', (err) => {
+                console.error('Peer错误:', err);
+                if (err.type === 'peer-unavailable') {
+                    alert('❌ 房间不存在，请检查房间号是否正确');
+                } else {
+                    alert('❌ 连接失败: ' + err.message);
+                }
+                statusDisplay.className = 'status offline';
+                statusDisplay.textContent = '🔴 连接失败';
+                isConnected = false;
+            });
         }
-    }
 
-    // ============================================================
-    //  辅助：显示信令对话框
-    // ============================================================
+        // ============================================================
+        //  UI更新 & 绘图
+        // ============================================================
 
-    function showSignalDialog(title, data) {
-        // 创建一个模态框显示数据
-        const modal = document.createElement('div');
-        modal.style.cssText = `
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.7); display: flex; justify-content: center; align-items: center;
-            z-index: 9999; font-family: monospace;
-        `;
-        const box = document.createElement('div');
-        box.style.cssText = `
-            background: #1a3a4a; padding: 30px; border-radius: 20px; max-width: 500px;
-            border: 2px solid #4a8ba8; color: #d4edff; text-align: center;
-        `;
-        box.innerHTML = `
-            <h3 style="margin-top:0;">${title}</h3>
-            <textarea style="width:100%; height:120px; background:#0a2a38; color:#d4edff; border:1px solid #2a6279; border-radius:10px; padding:10px; font-size:12px; resize:vertical;">${data}</textarea>
-            <br><br>
-            <button onclick="this.parentElement.parentElement.remove()" style="background:#4f8aa8; border:none; color:white; padding:8px 24px; border-radius:40px; cursor:pointer; font-size:14px;">✅ 已复制，关闭</button>
-            <button onclick="navigator.clipboard.writeText('${data}').then(()=>alert('已复制！'))" style="background:#27ae60; border:none; color:white; padding:8px 24px; border-radius:40px; cursor:pointer; font-size:14px; margin-left:8px;">📋 复制</button>
-        `;
-        modal.appendChild(box);
-        document.body.appendChild(modal);
-
-        // 自动复制
-        navigator.clipboard.writeText(data).catch(() => {});
-    }
-
-    // ============================================================
-    //  UI更新 & 绘图
-    // ============================================================
-
-    function updateUI() {
-        const count = Object.keys(players).length;
-        playerCountEl.textContent = count;
-        if (!gameRunning) {
-            if (winnerId !== null && players[winnerId]) {
-                winnerSpan.textContent = players[winnerId].name;
+        function updateUI() {
+            const count = Object.keys(players).length;
+            playerCountEl.textContent = count;
+            if (!gameRunning) {
+                if (winnerId !== null && players[winnerId]) {
+                    winnerSpan.textContent = players[winnerId].name;
+                } else {
+                    winnerSpan.textContent = '💀 平局';
+                }
             } else {
-                winnerSpan.textContent = '💀 平局';
-            }
-        } else {
-            winnerSpan.textContent = '⚡ 进行中';
-        }
-    }
-
-    function draw() {
-        ctx.clearRect(0, 0, 800, 600);
-
-        // 背景
-        ctx.strokeStyle = '#2a4a5a';
-        ctx.lineWidth = 1;
-        for (let i = 0; i < 800; i += 40) {
-            ctx.beginPath();
-            ctx.moveTo(i, 0);
-            ctx.lineTo(i, 600);
-            ctx.strokeStyle = '#2a4a5a';
-            ctx.stroke();
-        }
-        for (let i = 0; i < 600; i += 40) {
-            ctx.beginPath();
-            ctx.moveTo(0, i);
-            ctx.lineTo(800, i);
-            ctx.strokeStyle = '#2a4a5a';
-            ctx.stroke();
-        }
-
-        // 障碍物
-        for (let ob of obstacles) {
-            if (!ob.alive) continue;
-            const alpha = 0.5 + 0.5 * (ob.hp / ob.maxHp);
-            ctx.fillStyle = `rgba(70, 120, 140, ${alpha})`;
-            ctx.shadowColor = '#aaccdd';
-            ctx.shadowBlur = 8;
-            ctx.fillRect(ob.x, ob.y, ob.w, ob.h);
-            ctx.shadowBlur = 0;
-            ctx.strokeStyle = '#b8d8e8';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(ob.x, ob.y, ob.w, ob.h);
-            if (ob.hp > 0) {
-                ctx.fillStyle = '#c8e6f0';
-                ctx.font = '10px monospace';
-                ctx.fillText('🛡️'.repeat(ob.hp), ob.x + 4, ob.y + 14);
+                winnerSpan.textContent = '⚡ 进行中';
             }
         }
 
-        // 子弹
-        for (let b of bullets) {
-            ctx.beginPath();
-            ctx.arc(b.x, b.y, b.radius || 5, 0, 2 * Math.PI);
-            ctx.fillStyle = '#ffdd77';
-            ctx.shadowColor = '#ffbb33';
-            ctx.shadowBlur = 18;
-            ctx.fill();
-            ctx.shadowBlur = 0;
-        }
+        function draw() {
+            ctx.clearRect(0, 0, 800, 600);
 
-        // 玩家
-        for (let id in players) {
-            const p = players[id];
-            if (!p.alive) {
+            // 背景
+            ctx.strokeStyle = '#2a4a5a';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < 800; i += 40) {
+                ctx.beginPath();
+                ctx.moveTo(i, 0);
+                ctx.lineTo(i, 600);
+                ctx.strokeStyle = '#2a4a5a';
+                ctx.stroke();
+            }
+            for (let i = 0; i < 600; i += 40) {
+                ctx.beginPath();
+                ctx.moveTo(0, i);
+                ctx.lineTo(800, i);
+                ctx.strokeStyle = '#2a4a5a';
+                ctx.stroke();
+            }
+
+            // 障碍物
+            for (let ob of obstacles) {
+                if (!ob.alive) continue;
+                const alpha = 0.5 + 0.5 * (ob.hp / ob.maxHp);
+                ctx.fillStyle = `rgba(70, 120, 140, ${alpha})`;
+                ctx.shadowColor = '#aaccdd';
+                ctx.shadowBlur = 8;
+                ctx.fillRect(ob.x, ob.y, ob.w, ob.h);
+                ctx.shadowBlur = 0;
+                ctx.strokeStyle = '#b8d8e8';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(ob.x, ob.y, ob.w, ob.h);
+                if (ob.hp > 0) {
+                    ctx.fillStyle = '#c8e6f0';
+                    ctx.font = '10px monospace';
+                    ctx.fillText('🛡️'.repeat(ob.hp), ob.x + 4, ob.y + 14);
+                }
+            }
+
+            // 子弹
+            for (let b of bullets) {
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, b.radius || 5, 0, 2 * Math.PI);
+                ctx.fillStyle = '#ffdd77';
+                ctx.shadowColor = '#ffbb33';
+                ctx.shadowBlur = 18;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+
+            // 玩家
+            for (let id in players) {
+                const p = players[id];
+                if (!p.alive) {
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 16, 0, 2 * Math.PI);
+                    ctx.fillStyle = '#334455';
+                    ctx.fill();
+                    ctx.fillStyle = '#667788';
+                    ctx.font = '20px sans-serif';
+                    ctx.fillText('💀', p.x - 14, p.y + 8);
+                    continue;
+                }
+
+                ctx.shadowColor = '#00000055';
+                ctx.shadowBlur = 14;
                 ctx.beginPath();
                 ctx.arc(p.x, p.y, 16, 0, 2 * Math.PI);
-                ctx.fillStyle = '#334455';
+                ctx.fillStyle = p.color || COLORS[id % COLORS.length];
                 ctx.fill();
-                ctx.fillStyle = '#667788';
-                ctx.font = '20px sans-serif';
-                ctx.fillText('💀', p.x - 14, p.y + 8);
-                continue;
-            }
-
-            ctx.shadowColor = '#00000055';
-            ctx.shadowBlur = 14;
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, 16, 0, 2 * Math.PI);
-            ctx.fillStyle = p.color || COLORS[id % COLORS.length];
-            ctx.fill();
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 2.5;
-            ctx.stroke();
-
-            ctx.shadowBlur = 0;
-            const angle = p.angle || 0;
-            const tipX = p.x + Math.cos(angle) * 26;
-            const tipY = p.y + Math.sin(angle) * 26;
-            ctx.beginPath();
-            ctx.moveTo(p.x + Math.cos(angle) * 6, p.y + Math.sin(angle) * 6);
-            ctx.lineTo(tipX, tipY);
-            ctx.strokeStyle = '#1a1a2c';
-            ctx.lineWidth = 5;
-            ctx.stroke();
-            ctx.strokeStyle = '#f0f0f0';
-            ctx.lineWidth = 2.5;
-            ctx.stroke();
-
-            ctx.fillStyle = '#fff6d0';
-            ctx.font = 'bold 15px monospace';
-            ctx.shadowBlur = 8;
-            ctx.shadowColor = '#000';
-            ctx.fillText('❤️'.repeat(Math.max(0, p.hp)), p.x - 18, p.y - 30);
-            ctx.fillStyle = '#e0f0ff';
-            ctx.font = 'bold 12px sans-serif';
-            ctx.fillText(p.name || `玩家`, p.x - 20, p.y - 50);
-            ctx.shadowBlur = 0;
-
-            if (id === myId) {
                 ctx.strokeStyle = '#ffffff';
-                ctx.lineWidth = 2;
-                ctx.setLineDash([4, 4]);
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, 22, 0, 2 * Math.PI);
+                ctx.lineWidth = 2.5;
                 ctx.stroke();
-                ctx.setLineDash([]);
-            }
-        }
 
-        // 鼠标准星
-        if (localPlayer && localPlayer.alive) {
-            ctx.beginPath();
-            ctx.arc(mouseX, mouseY, 6, 0, 2 * Math.PI);
-            ctx.fillStyle = '#ffdd88';
-            ctx.shadowColor = '#ffaa33';
-            ctx.shadowBlur = 20;
-            ctx.fill();
-            ctx.shadowBlur = 0;
-            ctx.beginPath();
-            ctx.moveTo(mouseX - 14, mouseY);
-            ctx.lineTo(mouseX + 14, mouseY);
-            ctx.moveTo(mouseX, mouseY - 14);
-            ctx.lineTo(mouseX, mouseY + 14);
-            ctx.strokeStyle = '#ffe066';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-        }
+                ctx.shadowBlur = 0;
+                const angle = p.angle || 0;
+                const tipX = p.x + Math.cos(angle) * 26;
+                const tipY = p.y + Math.sin(angle) * 26;
+                ctx.beginPath();
+                ctx.moveTo(p.x + Math.cos(angle) * 6, p.y + Math.sin(angle) * 6);
+                ctx.lineTo(tipX, tipY);
+                ctx.strokeStyle = '#1a1a2c';
+                ctx.lineWidth = 5;
+                ctx.stroke();
+                ctx.strokeStyle = '#f0f0f0';
+                ctx.lineWidth = 2.5;
+                ctx.stroke();
 
-        if (!gameRunning) {
-            ctx.fillStyle = 'rgba(0,0,0,0.4)';
-            ctx.fillRect(0, 0, 800, 600);
-            ctx.font = 'bold 44px sans-serif';
-            ctx.fillStyle = '#ffe484';
-            ctx.shadowColor = '#000000';
-            ctx.shadowBlur = 20;
-            let msg = '💥 平局';
-            if (winnerId !== null && players[winnerId]) {
-                msg = `🏆 ${players[winnerId].name} 获胜！`;
-            }
-            ctx.fillText(msg, 200, 320);
-            ctx.shadowBlur = 0;
-        }
+                ctx.fillStyle = '#fff6d0';
+                ctx.font = 'bold 15px monospace';
+                ctx.shadowBlur = 8;
+                ctx.shadowColor = '#000';
+                ctx.fillText('❤️'.repeat(Math.max(0, p.hp)), p.x - 18, p.y - 30);
+                ctx.fillStyle = '#e0f0ff';
+                ctx.font = 'bold 12px sans-serif';
+                ctx.fillText(p.name || `玩家`, p.x - 20, p.y - 50);
+                ctx.shadowBlur = 0;
 
-        updateUI();
-    }
-
-    // ============================================================
-    //  主循环
-    // ============================================================
-
-    function gameLoop() {
-        if (isConnected && localPlayer) {
-            updateLocalPlayer();
-            if (isHost) {
-                updateBullets();
-            }
-        }
-        draw();
-        requestAnimationFrame(gameLoop);
-    }
-
-    // ============================================================
-    //  连接管理
-    // ============================================================
-
-    function disconnect() {
-        if (dataChannel) {
-            try { dataChannel.close(); } catch (e) {}
-            dataChannel = null;
-        }
-        if (peerConnection) {
-            try { peerConnection.close(); } catch (e) {}
-            peerConnection = null;
-        }
-        isConnected = false;
-        isHost = false;
-        players = {};
-        bullets = [];
-        localPlayer = null;
-        myId = null;
-        statusDisplay.className = 'status offline';
-        statusDisplay.textContent = '⚪ 未连接';
-        updateUI();
-        // 移除所有模态框
-        document.querySelectorAll('div[style*="position: fixed"]').forEach(el => el.remove());
-    }
-
-    // ============================================================
-    //  事件绑定
-    // ============================================================
-
-    document.getElementById('hostBtn').addEventListener('click', createHost);
-    document.getElementById('joinBtn').addEventListener('click', () => {
-        const hostId = document.getElementById('hostInput').value.trim();
-        if (hostId && hostId !== '主机已创建') {
-            joinHost(hostId);
-        } else {
-            alert('请输入主机IP');
-        }
-    });
-    document.getElementById('disconnectBtn').addEventListener('click', disconnect);
-
-    canvas.addEventListener('mousemove', (e) => {
-        const rect = canvas.getBoundingClientRect();
-        const scaleX = canvas.width / rect.width;
-        const scaleY = canvas.height / rect.height;
-        mouseX = Math.min(800, Math.max(0, (e.clientX - rect.left) * scaleX));
-        mouseY = Math.min(600, Math.max(0, (e.clientY - rect.top) * scaleY));
-    });
-
-    canvas.addEventListener('mousedown', (e) => {
-        if (e.button === 0) {
-            e.preventDefault();
-            mousePressed = true;
-        }
-    });
-
-    canvas.addEventListener('mouseup', (e) => {
-        if (e.button === 0) e.preventDefault();
-    });
-
-    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-
-    document.addEventListener('keydown', (e) => {
-        const key = e.key.toLowerCase();
-        keys[key] = true;
-        if (['w', 'a', 's', 'd', ' '].includes(key) || e.key === ' ') {
-            e.preventDefault();
-        }
-    });
-
-    document.addEventListener('keyup', (e) => {
-        const key = e.key.toLowerCase();
-        keys[key] = false;
-        if (['w', 'a', 's', 'd', ' '].includes(key) || e.key === ' ') {
-            e.preventDefault();
-        }
-    });
-
-    window.addEventListener('blur', () => {
-        for (let k in keys) keys[k] = false;
-        mousePressed = false;
-    });
-
-    // 暴露函数给全局用于调试
-    window.handleSignalData = function(data) {
-        try {
-            const parsed = JSON.parse(atob(data));
-            if (parsed.type === 'answer' && isHost) {
-                // 处理客户端的 Answer
-                if (peerConnection) {
-                    peerConnection.setRemoteDescription(new RTCSessionDescription(parsed.sdp));
-                    statusDisplay.className = 'status online';
-                    statusDisplay.textContent = '🟢 已连接 (主机)';
+                if (id === myId) {
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([4, 4]);
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 22, 0, 2 * Math.PI);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
                 }
             }
-        } catch (e) {
-            console.error('信令处理失败', e);
+
+            // 鼠标准星
+            if (localPlayer && localPlayer.alive) {
+                ctx.beginPath();
+                ctx.arc(mouseX, mouseY, 6, 0, 2 * Math.PI);
+                ctx.fillStyle = '#ffdd88';
+                ctx.shadowColor = '#ffaa33';
+                ctx.shadowBlur = 20;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+                ctx.beginPath();
+                ctx.moveTo(mouseX - 14, mouseY);
+                ctx.lineTo(mouseX + 14, mouseY);
+                ctx.moveTo(mouseX, mouseY - 14);
+                ctx.lineTo(mouseX, mouseY + 14);
+                ctx.strokeStyle = '#ffe066';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+
+            if (!gameRunning) {
+                ctx.fillStyle = 'rgba(0,0,0,0.4)';
+                ctx.fillRect(0, 0, 800, 600);
+                ctx.font = 'bold 44px sans-serif';
+                ctx.fillStyle = '#ffe484';
+                ctx.shadowColor = '#000000';
+                ctx.shadowBlur = 20;
+                let msg = '💥 平局';
+                if (winnerId !== null && players[winnerId]) {
+                    msg = `🏆 ${players[winnerId].name} 获胜！`;
+                }
+                ctx.fillText(msg, 200, 320);
+                ctx.shadowBlur = 0;
+            }
+
+            updateUI();
         }
-    };
 
-    console.log('🎮 局域网联机枪战 (修复版)');
-    console.log('📋 使用说明:');
-    console.log('1. 一人点击"创建房间"，复制弹出的信令数据');
-    console.log('2. 另一人输入主机IP，点击"加入"，粘贴信令数据');
-    console.log('3. 连接成功后自动开始对战！');
+        // ============================================================
+        //  主循环
+        // ============================================================
 
-    gameLoop();
-</script>
+        function gameLoop() {
+            if (isConnected && localPlayer) {
+                updateLocalPlayer();
+                if (isHost) {
+                    updateBullets();
+                }
+            }
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // ============================================================
+        //  连接管理
+        // ============================================================
+
+        function disconnect() {
+            if (conn) {
+                try { conn.close(); } catch (e) {}
+                conn = null;
+            }
+            if (peer) {
+                try { peer.destroy(); } catch (e) {}
+                peer = null;
+            }
+            isConnected = false;
+            isHost = false;
+            players = {};
+            bullets = [];
+            localPlayer = null;
+            myId = null;
+            roomId = '';
+            roomIdDisplay.textContent = '📋 房间号: 无';
+            statusDisplay.className = 'status offline';
+            statusDisplay.textContent = '⚪ 未连接';
+            updateUI();
+        }
+
+        // ============================================================
+        //  事件绑定
+        // ============================================================
+
+        document.getElementById('hostBtn').addEventListener('click', createRoom);
+        document.getElementById('joinBtn').addEventListener('click', () => {
+            const id = document.getElementById('roomInput').value.trim();
+            if (id) {
+                joinRoom(id);
+            } else {
+                alert('请输入房间号');
+            }
+        });
+        document.getElementById('disconnectBtn').addEventListener('click', disconnect);
+
+        // 回车键触发加入
+        document.getElementById('roomInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                document.getElementById('joinBtn').click();
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            mouseX = Math.min(800, Math.max(0, (e.clientX - rect.left) * scaleX));
+            mouseY = Math.min(600, Math.max(0, (e.clientY - rect.top) * scaleY));
+        });
+
+        canvas.addEventListener('mousedown', (e) => {
+            if (e.button === 0) {
+                e.preventDefault();
+                mousePressed = true;
+            }
+        });
+
+        canvas.addEventListener('mouseup', (e) => {
+            if (e.button === 0) e.preventDefault();
+        });
+
+        canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+        document.addEventListener('keydown', (e) => {
+            const key = e.key.toLowerCase();
+            keys[key] = true;
+            if (['w', 'a', 's', 'd', ' '].includes(key) || e.key === ' ') {
+                e.preventDefault();
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            const key = e.key.toLowerCase();
+            keys[key] = false;
+            if (['w', 'a', 's', 'd', ' '].includes(key) || e.key === ' ') {
+                e.preventDefault();
+            }
+        });
+
+        window.addEventListener('blur', () => {
+            for (let k in keys) keys[k] = false;
+            mousePressed = false;
+        });
+
+        console.log('🎮 免费联机枪战已启动！');
+        console.log('📋 使用说明:');
+        console.log('1. 一人点击"创建房间"，获得4位房间号');
+        console.log('2. 其他人输入房间号，点击"加入房间"');
+        console.log('3. 连接成功后自动开始对战！');
+        console.log('💡 无需任何配置，完全免费！');
+
+        gameLoop();
+    </script>
 </body>
 </html>
