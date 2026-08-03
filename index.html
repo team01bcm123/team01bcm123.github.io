@@ -3,9 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🔫 P2P 联机枪战 · 无需服务器</title>
-    <!-- 使用 PeerJS 实现 P2P 连接 -->
-    <script src="https://unpkg.com/peerjs@1.5.1/dist/peerjs.min.js"></script>
+    <title>🔫 局域网联机枪战</title>
     <style>
         * { box-sizing: border-box; user-select: none; }
         body {
@@ -16,6 +14,7 @@
             justify-content: center;
             align-items: center;
             font-family: 'Segoe UI', sans-serif;
+            padding: 16px;
         }
         .container {
             background: #1f4055;
@@ -23,14 +22,17 @@
             border-radius: 40px;
             border: 1px solid #3d7a94;
             box-shadow: 0 20px 30px rgba(0,0,0,0.7);
+            max-width: 860px;
+            width: 100%;
         }
         canvas {
             display: block;
             background: #1f3f4f;
             border-radius: 24px;
             box-shadow: inset 0 0 0 2px #4d8ba8;
-            width: 800px;
-            height: 600px;
+            width: 100%;
+            height: auto;
+            aspect-ratio: 800/600;
             cursor: crosshair;
         }
         .panel {
@@ -47,64 +49,86 @@
             padding: 4px 16px;
             border-radius: 40px;
             border: 1px solid #2f6279;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
+            font-weight: 600;
         }
-        .status .online { color: #6fcf97; }
-        .status .offline { color: #eb5757; }
+        .status.online { color: #6fcf97; }
+        .status.offline { color: #eb5757; }
+        .status.connecting { color: #f2c94c; }
         .btn {
-            background: #4f8aa8;
             border: none;
             color: white;
             font-weight: 700;
             padding: 5px 16px;
             border-radius: 40px;
             cursor: pointer;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             transition: 0.15s;
-            border: 1px solid #8bc9e6;
         }
-        .btn:hover { background: #5f9ab8; }
-        .btn.danger { background: #c74e3c; border-color: #e6836e; }
-        .btn.danger:hover { background: #d85e4c; }
-        .btn.success { background: #27ae60; border-color: #6fcf97; }
-        .btn.success:hover { background: #2ecc71; }
+        .btn-host { background: #27ae60; border: 1px solid #6fcf97; }
+        .btn-host:hover { background: #2ecc71; }
+        .btn-join { background: #4f8aa8; border: 1px solid #8bc9e6; }
+        .btn-join:hover { background: #5f9ab8; }
+        .btn-danger { background: #c74e3c; border: 1px solid #e6836e; }
+        .btn-danger:hover { background: #d85e4c; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
         .input-group {
             display: flex;
             gap: 6px;
             align-items: center;
+            background: #0e2a38;
+            padding: 2px 8px 2px 14px;
+            border-radius: 40px;
+            border: 1px solid #2f6279;
         }
         .input-group input {
-            background: #0e2a38;
-            border: 1px solid #2f6279;
-            border-radius: 30px;
-            padding: 4px 12px;
+            background: transparent;
+            border: none;
             color: #d4edff;
-            width: 100px;
+            padding: 4px 0;
+            width: 110px;
             font-size: 0.85rem;
+            outline: none;
         }
-        .input-group input:focus { outline: none; border-color: #4d8ba8; }
+        .input-group input::placeholder { color: #5a7a8a; }
+        .stats {
+            display: flex;
+            gap: 14px;
+            background: #102b38;
+            padding: 4px 16px;
+            border-radius: 60px;
+            border: 1px solid #2f6279;
+            font-size: 0.8rem;
+        }
+        .stats span { color: #b3def5; }
+        .stats strong { color: #f5d742; }
         .hint {
             color: #9ec3d6;
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             display: flex;
-            gap: 12px;
             flex-wrap: wrap;
-            margin-top: 6px;
+            gap: 4px 14px;
+            margin-top: 8px;
+            justify-content: center;
         }
-        .hint span { background: #13303f; padding: 2px 10px; border-radius: 30px; border: 1px solid #2b6279; }
+        .hint span {
+            background: #13303f;
+            padding: 2px 10px;
+            border-radius: 30px;
+            border: 1px solid #2b6279;
+        }
+        .hint .p1 { color: #f2c94c; }
+        .hint .p2 { color: #eb5757; }
+        .hint .p3 { color: #2f9bff; }
+        .hint .p4 { color: #6fcf97; }
         .player-list {
             font-size: 0.8rem;
             color: #b3def5;
-            background: #102b38;
-            padding: 2px 14px;
-            border-radius: 30px;
-            border: 1px solid #2f6279;
         }
-        @media (max-width: 860px) {
-            canvas { width: 100%; height: auto; aspect-ratio: 4/3; }
-            .container { padding: 10px; }
-            .panel { flex-direction: column; align-items: stretch; }
+        @media (max-width: 600px) {
+            .panel { flex-direction: column; align-items: stretch; gap: 6px; }
             .input-group { justify-content: center; }
+            .stats { justify-content: center; }
         }
     </style>
 </head>
@@ -112,149 +136,417 @@
 <div class="container">
     <canvas id="gameCanvas" width="800" height="600"></canvas>
     <div class="panel">
-        <div class="status" id="statusDisplay">🔴 <span class="offline">未连接</span></div>
+        <div class="status offline" id="statusDisplay">⚪ 未连接</div>
         <div class="input-group">
-            <input type="text" id="peerIdInput" placeholder="对方ID" value="">
-            <button class="btn success" id="connectBtn">📞 连接</button>
-            <button class="btn" id="createBtn">🎯 创建房间</button>
+            <input type="text" id="hostInput" placeholder="主机IP" value="127.0.0.1">
+            <button class="btn btn-join" id="joinBtn">📥 加入</button>
+            <button class="btn btn-host" id="hostBtn">🚀 创建房间</button>
+            <button class="btn btn-danger" id="disconnectBtn">⛔ 断开</button>
         </div>
-        <div class="player-list" id="playerList">👥 0 人</div>
+        <div class="stats">
+            <span>🏆 <strong id="winnerDisplay">-</strong></span>
+            <span>👥 <strong id="playerCount">0</strong></span>
+        </div>
     </div>
     <div class="hint">
-        <span>🖱️ 鼠标瞄准 · 左键射击</span>
-        <span>WASD 移动</span>
-        <span>💡 双方都需打开此页面</span>
+        <span class="p1">🟡 P1: WASD + 空格</span>
+        <span class="p2">🔴 P2: 方向键 + Shift</span>
+        <span class="p3">🔵 P3: IJKL + U</span>
+        <span class="p4">🟢 P4: TFGH + R</span>
+        <span>🧱 掩体可破坏</span>
+        <span>❤️ 每人3条命</span>
     </div>
 </div>
 
 <script>
     // ============================================================
-    //  🚀 P2P 联机枪战 (PeerJS)
-    //  无需服务器，点对点直连
+    //  🌐 局域网联机枪战 (WebRTC + 手动信令)
+    //  使用 BroadcastChannel 或 手动IP交换
+    //  实际局域网中，使用 WebRTC 需要信令服务器
+    //  这里我们使用 手动信令 + 直接连接
     // ============================================================
 
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const statusDisplay = document.getElementById('statusDisplay');
-    const playerList = document.getElementById('playerList');
+    const winnerSpan = document.getElementById('winnerDisplay');
+    const playerCountEl = document.getElementById('playerCount');
 
     // ----- 游戏状态 -----
-    let players = {};           // { id: { x, y, angle, hp, alive, name, color } }
+    let players = {};
+    let localPlayer = null;
     let bullets = [];
     let obstacles = [];
-    let myId = null;
-    let peer = null;
-    let connections = {};       // { peerId: DataConnection }
     let gameRunning = true;
     let winnerId = null;
+    let myId = null;
     let isHost = false;
-    let localPlayer = null;
+    let peerConnections = {};  // { peerId: RTCPeerConnection }
+    let dataChannels = {};     // { peerId: RTCDataChannel }
+    let localId = null;
+    let playerIdCounter = 0;
 
+    // ----- 玩家配置 -----
     const COLORS = ['#f2c94c', '#eb5757', '#2f9bff', '#6fcf97', '#bb6bd9', '#f2994a', '#27ae60', '#e74c3c'];
-    const NAMES = ['🟡 黄', '🔴 红', '🔵 蓝', '🟢 绿', '🟣 紫', '🟠 橙', '🟢 翠', '🔴 赤'];
+    const NAMES = ['🟡 黄', '🔴 红', '🔵 蓝', '🟢 绿', '🟣 紫', '🟠 橙', '🟢 翠', '🔴 朱'];
+    const SPAWNS = [
+        { x: 150, y: 150 }, { x: 650, y: 150 },
+        { x: 150, y: 450 }, { x: 650, y: 450 },
+        { x: 400, y: 80 }, { x: 400, y: 520 },
+        { x: 80, y: 300 }, { x: 720, y: 300 }
+    ];
 
-    // 鼠标状态
+    // 按键映射
+    const KEYMAP = [
+        { up: 'w', down: 's', left: 'a', right: 'd', fire: ' ' },
+        { up: 'arrowup', down: 'arrowdown', left: 'arrowleft', right: 'arrowright', fire: 'shift' },
+        { up: 'i', down: 'k', left: 'j', right: 'l', fire: 'u' },
+        { up: 't', down: 'g', left: 'f', right: 'h', fire: 'r' }
+    ];
+
+    // 键盘状态
+    const keys = {};
     let mouseX = 400, mouseY = 300;
     let mousePressed = false;
-    let shootCooldown = 0;
 
-    // 键盘
-    const keys = {};
+    // ----- 信令通道 (BroadcastChannel 用于局域网发现) -----
+    let signalChannel = null;
+    let isConnected = false;
 
-    // ----- 初始化障碍物 -----
-    function initObstacles() {
+    // ----- 创建障碍物 -----
+    function createObstacles() {
         return [
-            { id: 'o1', x: 350, y: 200, w: 80, h: 30, hp: 3, maxHp: 3, alive: true },
-            { id: 'o2', x: 400, y: 350, w: 80, h: 30, hp: 3, maxHp: 3, alive: true },
-            { id: 'o3', x: 200, y: 420, w: 30, h: 80, hp: 3, maxHp: 3, alive: true },
-            { id: 'o4', x: 580, y: 120, w: 30, h: 80, hp: 3, maxHp: 3, alive: true },
-            { id: 'o5', x: 120, y: 260, w: 30, h: 80, hp: 3, maxHp: 3, alive: true },
-            { id: 'o6', x: 650, y: 400, w: 30, h: 80, hp: 3, maxHp: 3, alive: true },
+            { x: 350, y: 200, w: 80, h: 30, hp: 3, maxHp: 3, alive: true },
+            { x: 400, y: 350, w: 80, h: 30, hp: 3, maxHp: 3, alive: true },
+            { x: 200, y: 420, w: 30, h: 80, hp: 3, maxHp: 3, alive: true },
+            { x: 580, y: 120, w: 30, h: 80, hp: 3, maxHp: 3, alive: true },
+            { x: 120, y: 260, w: 30, h: 80, hp: 3, maxHp: 3, alive: true },
+            { x: 650, y: 400, w: 30, h: 80, hp: 3, maxHp: 3, alive: true },
         ];
     }
-    obstacles = initObstacles();
 
     // ----- 创建玩家 -----
-    function createPlayer(id, x, y) {
+    function createPlayer(id, x, y, name, color) {
         return {
             id: id,
             x: x, y: y,
-            angle: 0,
+            radius: 16,
+            speed: 3.2,
             hp: 3,
             maxHp: 3,
             alive: true,
-            color: COLORS[id % COLORS.length],
-            name: NAMES[id % NAMES.length] || `玩家${id}`,
-            radius: 16,
-            speed: 3.0,
-            shootCooldown: 0
+            color: color || COLORS[id % COLORS.length],
+            name: name || NAMES[id % NAMES.length] || `玩家${id}`,
+            angle: 0,
+            shootCooldown: 0,
+            keys: KEYMAP[id % KEYMAP.length]
         };
     }
 
-    // ----- 生成出生点 -----
-    function getSpawn(id) {
-        const spawns = [
-            { x: 150, y: 150 }, { x: 650, y: 150 },
-            { x: 150, y: 450 }, { x: 650, y: 450 },
-            { x: 400, y: 80 }, { x: 400, y: 520 },
-            { x: 80, y: 300 }, { x: 720, y: 300 }
-        ];
-        return spawns[id % spawns.length];
+    // ----- 生成唯一ID -----
+    function genId() {
+        return 'p' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
     }
 
-    // ----- 初始化本地玩家 -----
-    function initLocalPlayer(id) {
-        const spawn = getSpawn(id);
-        localPlayer = createPlayer(id, spawn.x, spawn.y);
+    // ----- 初始化游戏 (本地) -----
+    function initLocalGame() {
+        const id = genId();
+        localId = id;
+        const spawn = SPAWNS[0];
+        localPlayer = createPlayer(id, spawn.x, spawn.y, '我', COLORS[0]);
         players[id] = localPlayer;
         myId = id;
+        obstacles = createObstacles();
+        bullets = [];
+        gameRunning = true;
+        winnerId = null;
+        updateUI();
     }
 
-    // ----- 广播消息到所有连接 -----
-    function broadcast(data) {
-        const msg = JSON.stringify(data);
-        for (let conn of Object.values(connections)) {
-            if (conn.open) {
-                conn.send(msg);
+    // ============================================================
+    //  WebRTC 连接管理
+    // ============================================================
+
+    const STUN_SERVERS = {
+        iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' }
+        ]
+    };
+
+    // ----- 创建主机 (等待连接) -----
+    function createHost() {
+        if (isConnected) disconnect();
+
+        initLocalGame();
+        isHost = true;
+        isConnected = true;
+        statusDisplay.className = 'status online';
+        statusDisplay.textContent = '🟢 主机 (等待加入)';
+        updateUI();
+
+        // 监听广播频道 (局域网发现)
+        try {
+            signalChannel = new BroadcastChannel('gunfight_lan');
+            signalChannel.onmessage = (e) => {
+                const data = e.data;
+                if (data.type === 'discover' && isHost) {
+                    // 回复主机信息
+                    signalChannel.postMessage({
+                        type: 'host_announce',
+                        hostId: localId,
+                        playerCount: Object.keys(players).length
+                    });
+                }
+                if (data.type === 'join_request' && isHost) {
+                    // 收到加入请求，建立连接
+                    if (data.peerId && data.peerId !== localId) {
+                        handleJoinRequest(data.peerId);
+                    }
+                }
+            };
+            // 广播自己
+            signalChannel.postMessage({ type: 'discover' });
+        } catch (e) {
+            console.warn('BroadcastChannel 不可用，请手动输入IP', e);
+        }
+
+        // 显示本机IP提示
+        showLocalIP();
+    }
+
+    // ----- 显示本机IP -----
+    function showLocalIP() {
+        // 通过WebRTC获取本地IP (简化)
+        const pc = new RTCPeerConnection({ iceServers: [] });
+        pc.createDataChannel('ip');
+        pc.createOffer().then(offer => {
+            pc.setLocalDescription(offer);
+        }).catch(() => {});
+        pc.onicecandidate = (e) => {
+            if (e.candidate) {
+                const ip = e.candidate.candidate.match(/(\d+\.\d+\.\d+\.\d+)/);
+                if (ip) {
+                    document.getElementById('hostInput').value = ip[0];
+                    pc.close();
+                }
             }
+        };
+        setTimeout(() => pc.close(), 3000);
+    }
+
+    // ----- 处理加入请求 (主机) -----
+    function handleJoinRequest(peerId) {
+        if (peerConnections[peerId]) return;
+
+        console.log('📞 处理加入请求:', peerId);
+        const pc = new RTCPeerConnection(STUN_SERVERS);
+        peerConnections[peerId] = pc;
+
+        pc.ondatachannel = (event) => {
+            const channel = event.channel;
+            dataChannels[peerId] = channel;
+            setupDataChannel(channel, peerId);
+        };
+
+        pc.createOffer().then(offer => {
+            return pc.setLocalDescription(offer);
+        }).then(() => {
+            // 通过广播频道发送offer
+            if (signalChannel) {
+                signalChannel.postMessage({
+                    type: 'offer',
+                    from: localId,
+                    to: peerId,
+                    sdp: pc.localDescription
+                });
+            }
+        });
+
+        pc.onicecandidate = (e) => {
+            if (e.candidate && signalChannel) {
+                signalChannel.postMessage({
+                    type: 'ice_candidate',
+                    from: localId,
+                    to: peerId,
+                    candidate: e.candidate
+                });
+            }
+        };
+    }
+
+    // ----- 加入主机 (客户端) -----
+    function joinHost(hostId) {
+        if (isConnected) disconnect();
+
+        initLocalGame();
+        isHost = false;
+        isConnected = true;
+        statusDisplay.className = 'status connecting';
+        statusDisplay.textContent = '🟡 连接中...';
+
+        // 设置广播频道
+        try {
+            signalChannel = new BroadcastChannel('gunfight_lan');
+            signalChannel.onmessage = (e) => {
+                const data = e.data;
+                if (data.type === 'offer' && data.to === localId) {
+                    handleOffer(data);
+                }
+                if (data.type === 'ice_candidate' && data.to === localId) {
+                    handleIceCandidate(data);
+                }
+            };
+
+            // 发送加入请求
+            signalChannel.postMessage({
+                type: 'join_request',
+                peerId: localId,
+                hostId: hostId
+            });
+
+            // 创建PeerConnection
+            const pc = new RTCPeerConnection(STUN_SERVERS);
+            const channel = pc.createDataChannel('game');
+            dataChannels[hostId] = channel;
+            peerConnections[hostId] = pc;
+            setupDataChannel(channel, hostId);
+
+            pc.onicecandidate = (e) => {
+                if (e.candidate && signalChannel) {
+                    signalChannel.postMessage({
+                        type: 'ice_candidate',
+                        from: localId,
+                        to: hostId,
+                        candidate: e.candidate
+                    });
+                }
+            };
+
+            // 等待offer
+
+        } catch (e) {
+            console.error('加入失败', e);
+            statusDisplay.className = 'status offline';
+            statusDisplay.textContent = '🔴 连接失败';
+            isConnected = false;
         }
     }
 
-    // ----- 发送给特定玩家 -----
-    function sendTo(peerId, data) {
-        const conn = connections[peerId];
-        if (conn && conn.open) {
-            conn.send(JSON.stringify(data));
-        }
+    // ----- 处理Offer -----
+    function handleOffer(data) {
+        const pc = peerConnections[data.from];
+        if (!pc) return;
+        pc.setRemoteDescription(new RTCSessionDescription(data.sdp))
+            .then(() => pc.createAnswer())
+            .then(answer => pc.setLocalDescription(answer))
+            .then(() => {
+                if (signalChannel) {
+                    signalChannel.postMessage({
+                        type: 'answer',
+                        from: localId,
+                        to: data.from,
+                        sdp: pc.localDescription
+                    });
+                }
+            });
     }
 
-    // ----- 处理收到的消息 -----
-    function handleMessage(data, senderId) {
+    // ----- 处理Answer -----
+    function handleAnswer(data) {
+        const pc = peerConnections[data.from];
+        if (!pc) return;
+        pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
+    }
+
+    // ----- 处理ICE Candidate -----
+    function handleIceCandidate(data) {
+        const pc = peerConnections[data.from];
+        if (!pc) return;
+        pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+    }
+
+    // ----- 设置DataChannel -----
+    function setupDataChannel(channel, peerId) {
+        channel.onopen = () => {
+            console.log('✅ 数据通道已打开:', peerId);
+            statusDisplay.className = 'status online';
+            statusDisplay.textContent = isHost ? '🟢 主机 (已连接)' : '🟢 已连接';
+            // 发送玩家信息
+            sendPlayerInfo(peerId);
+        };
+
+        channel.onmessage = (e) => {
+            try {
+                const data = JSON.parse(e.data);
+                handlePeerMessage(data, peerId);
+            } catch (err) {
+                console.warn('消息解析失败', err);
+            }
+        };
+
+        channel.onclose = () => {
+            console.log('❌ 数据通道关闭:', peerId);
+            delete dataChannels[peerId];
+            delete peerConnections[peerId];
+            // 移除玩家
+            for (let id in players) {
+                if (id.startsWith('p') && id !== localId && !dataChannels[id]) {
+                    delete players[id];
+                }
+            }
+            updateUI();
+            statusDisplay.className = 'status offline';
+            statusDisplay.textContent = '🔴 断开连接';
+            isConnected = false;
+        };
+    }
+
+    // ----- 发送玩家信息 -----
+    function sendPlayerInfo(peerId) {
+        const channel = dataChannels[peerId];
+        if (!channel || channel.readyState !== 'open') return;
+        channel.send(JSON.stringify({
+            type: 'player_info',
+            player: {
+                id: localId,
+                x: localPlayer.x,
+                y: localPlayer.y,
+                color: localPlayer.color,
+                name: localPlayer.name,
+                hp: localPlayer.hp,
+                alive: localPlayer.alive
+            }
+        }));
+    }
+
+    // ============================================================
+    //  消息处理
+    // ============================================================
+
+    function handlePeerMessage(data, peerId) {
         switch (data.type) {
-            case 'state':
-                // 完整状态同步 (主机发给客户端)
-                players = data.players || {};
-                bullets = data.bullets || [];
-                obstacles = data.obstacles || [];
-                gameRunning = data.gameRunning !== undefined ? data.gameRunning : true;
-                winnerId = data.winnerId || null;
-                // 保留自己的玩家对象
-                if (myId && players[myId]) {
-                    localPlayer = players[myId];
+            case 'player_info':
+                // 添加或更新玩家
+                if (data.player && data.player.id !== localId) {
+                    if (!players[data.player.id]) {
+                        players[data.player.id] = createPlayer(
+                            data.player.id,
+                            data.player.x,
+                            data.player.y,
+                            data.player.name,
+                            data.player.color
+                        );
+                    }
+                    Object.assign(players[data.player.id], data.player);
+                    updateUI();
                 }
                 break;
 
-            case 'player_joined':
-                players[data.id] = data.player;
-                break;
-
-            case 'player_left':
-                delete players[data.id];
-                break;
-
             case 'player_update':
-                if (players[data.id]) {
-                    Object.assign(players[data.id], data.player);
+                if (data.player && data.player.id !== localId && players[data.player.id]) {
+                    Object.assign(players[data.player.id], data.player);
+                    updateUI();
                 }
                 break;
 
@@ -264,6 +556,18 @@
 
             case 'bullet_remove':
                 bullets = bullets.filter(b => b.id !== data.bulletId);
+                break;
+
+            case 'player_hit':
+                if (players[data.targetId]) {
+                    players[data.targetId].hp = data.hp;
+                    if (data.hp <= 0) players[data.targetId].alive = false;
+                }
+                break;
+
+            case 'game_over':
+                gameRunning = false;
+                winnerId = data.winnerId;
                 break;
 
             case 'obstacle_damage':
@@ -276,252 +580,152 @@
                 }
                 break;
 
-            case 'player_hit':
-                if (players[data.targetId]) {
-                    players[data.targetId].hp = data.hp;
-                    if (data.hp <= 0) {
-                        players[data.targetId].alive = false;
-                    }
-                }
-                break;
-
-            case 'game_over':
-                gameRunning = false;
-                winnerId = data.winnerId;
-                break;
-
-            case 'game_reset':
-                players = data.players || {};
-                bullets = [];
-                gameRunning = true;
-                winnerId = null;
-                obstacles = data.obstacles || [];
-                if (myId && players[myId]) {
-                    localPlayer = players[myId];
-                }
-                break;
-
             case 'sync_request':
-                // 客户端请求完整状态
-                if (isHost) {
-                    sendTo(senderId, {
-                        type: 'state',
-                        players: players,
-                        bullets: bullets,
-                        obstacles: obstacles,
-                        gameRunning: gameRunning,
-                        winnerId: winnerId
-                    });
+                // 发送完整状态
+                sendFullState(peerId);
+                break;
+
+            case 'full_state':
+                // 接收完整状态 (客户端)
+                if (!isHost) {
+                    players = data.players || {};
+                    bullets = data.bullets || [];
+                    obstacles = data.obstacles || [];
+                    gameRunning = data.gameRunning !== undefined ? data.gameRunning : true;
+                    winnerId = data.winnerId || null;
+                    // 保留自己的玩家
+                    if (localId && players[localId]) {
+                        localPlayer = players[localId];
+                    }
+                    updateUI();
                 }
                 break;
 
-            default:
-                console.log('未知消息:', data.type);
+            case 'player_joined':
+                if (data.player) {
+                    players[data.player.id] = data.player;
+                    updateUI();
+                }
+                break;
+
+            case 'player_left':
+                delete players[data.id];
+                updateUI();
+                break;
         }
     }
 
-    // ----- 创建房间 (主机) -----
-    function createRoom() {
-        if (peer) peer.destroy();
-        peer = new Peer({
-            debug: 2
-        });
+    // ----- 发送完整状态 (主机) -----
+    function sendFullState(peerId) {
+        const channel = dataChannels[peerId];
+        if (!channel || channel.readyState !== 'open') return;
+        channel.send(JSON.stringify({
+            type: 'full_state',
+            players: players,
+            bullets: bullets,
+            obstacles: obstacles,
+            gameRunning: gameRunning,
+            winnerId: winnerId
+        }));
+    }
 
-        peer.on('open', (id) => {
-            myId = id;
-            isHost = true;
-            initLocalPlayer(0);
-            obstacles = initObstacles();
-            gameRunning = true;
-            winnerId = null;
-            bullets = [];
-            statusDisplay.innerHTML = `🟢 <span class="online">主机 ${id}</span>`;
-            updateUI();
-            console.log('🎯 房间创建成功，ID:', id);
-            document.getElementById('peerIdInput').value = id;
-        });
-
-        peer.on('connection', (conn) => {
-            console.log('📞 新连接:', conn.peer);
-            connections[conn.peer] = conn;
-            conn.on('data', (data) => {
-                try {
-                    const msg = JSON.parse(data);
-                    handleMessage(msg, conn.peer);
-                    // 转发给其他客户端 (如果是主机)
-                    if (isHost) {
-                        // 检查是否是移动/射击消息，需要转发
-                        if (msg.type === 'player_update' || msg.type === 'bullet_spawn') {
-                            broadcast(data);
-                        }
-                    }
-                } catch (e) {
-                    console.warn('消息解析错误', e);
-                }
-            });
-            conn.on('close', () => {
-                delete connections[conn.peer];
-                if (isHost) {
-                    // 通知所有人有人离开
-                    broadcast({ type: 'player_left', id: conn.peer });
-                }
-                updateUI();
-            });
-
-            // 如果是主机，发送当前状态给新客户端
-            if (isHost) {
-                // 先把新玩家加入
-                const newPlayer = createPlayer(Object.keys(players).length, getSpawn(Object.keys(players).length));
-                players[newPlayer.id] = newPlayer;
-                broadcast({ type: 'player_joined', id: newPlayer.id, player: newPlayer });
-                // 发送完整状态
-                sendTo(conn.peer, {
-                    type: 'state',
-                    players: players,
-                    bullets: bullets,
-                    obstacles: obstacles,
-                    gameRunning: gameRunning,
-                    winnerId: winnerId
-                });
-                updateUI();
+    // ----- 广播消息 -----
+    function broadcast(data) {
+        for (let id in dataChannels) {
+            const ch = dataChannels[id];
+            if (ch && ch.readyState === 'open') {
+                ch.send(JSON.stringify(data));
             }
-        });
-
-        peer.on('error', (err) => {
-            console.error('Peer 错误:', err);
-            statusDisplay.innerHTML = '🔴 <span class="offline">错误: ' + err.message + '</span>';
-        });
+        }
     }
 
-    // ----- 连接房间 (客户端) -----
-    function joinRoom(hostId) {
-        if (peer) peer.destroy();
-        peer = new Peer({
-            debug: 2
-        });
+    // ============================================================
+    //  游戏逻辑
+    // ============================================================
 
-        peer.on('open', (id) => {
-            myId = id;
-            isHost = false;
-            initLocalPlayer(1); // 临时ID，等待主机分配
-            statusDisplay.innerHTML = `🟡 <span class="online">连接中...</span>`;
-            console.log('🔗 本地ID:', id);
+    // ----- 玩家移动 -----
+    function updateLocalPlayer() {
+        if (!localPlayer || !localPlayer.alive) return;
 
-            const conn = peer.connect(hostId);
-            conn.on('open', () => {
-                connections[hostId] = conn;
-                statusDisplay.innerHTML = `🟢 <span class="online">已连接 ${hostId}</span>`;
-                console.log('✅ 已连接到主机');
-                // 请求同步
-                sendTo(hostId, { type: 'sync_request' });
-            });
-
-            conn.on('data', (data) => {
-                try {
-                    const msg = JSON.parse(data);
-                    handleMessage(msg, hostId);
-                    // 更新本地玩家ID (如果主机分配了)
-                    if (msg.type === 'state' && msg.players && myId) {
-                        if (!msg.players[myId] && localPlayer) {
-                            // 主机可能分配了新ID，寻找匹配
-                            for (let id in msg.players) {
-                                if (msg.players[id].name === localPlayer.name && !players[id]) {
-                                    // 重新映射
-                                    const oldId = myId;
-                                    myId = id;
-                                    players[id] = localPlayer;
-                                    delete players[oldId];
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                } catch (e) {
-                    console.warn('消息解析错误', e);
-                }
-            });
-
-            conn.on('close', () => {
-                delete connections[hostId];
-                statusDisplay.innerHTML = '🔴 <span class="offline">与主机断开</span>';
-                console.log('❌ 与主机断开');
-            });
-        });
-
-        peer.on('error', (err) => {
-            console.error('Peer 错误:', err);
-            statusDisplay.innerHTML = '🔴 <span class="offline">连接失败: ' + err.message + '</span>';
-        });
-    }
-
-    // ----- 发送本地更新 -----
-    function sendLocalUpdate() {
-        if (!localPlayer || !myId) return;
-        if (!localPlayer.alive) return;
-
-        // 移动
+        const k = localPlayer.keys;
         let dx = 0, dy = 0;
-        if (keys['w'] || keys['arrowup']) dy -= 1;
-        if (keys['s'] || keys['arrowdown']) dy += 1;
-        if (keys['a'] || keys['arrowleft']) dx -= 1;
-        if (keys['d'] || keys['arrowright']) dx += 1;
+        if (keys[k.up]) dy -= 1;
+        if (keys[k.down]) dy += 1;
+        if (keys[k.left]) dx -= 1;
+        if (keys[k.right]) dx += 1;
 
+        // 角度 (鼠标)
         const angle = Math.atan2(mouseY - localPlayer.y, mouseX - localPlayer.x);
         localPlayer.angle = angle;
 
+        // 移动
         if (dx !== 0 || dy !== 0) {
             const len = Math.hypot(dx, dy);
-            localPlayer.x += (dx / len) * localPlayer.speed;
-            localPlayer.y += (dy / len) * localPlayer.speed;
-            // 边界
-            localPlayer.x = Math.max(localPlayer.radius, Math.min(800 - localPlayer.radius, localPlayer.x));
-            localPlayer.y = Math.max(localPlayer.radius, Math.min(600 - localPlayer.radius, localPlayer.y));
-        }
+            const moveX = (dx / len) * localPlayer.speed;
+            const moveY = (dy / len) * localPlayer.speed;
 
-        // 障碍物碰撞
-        for (let ob of obstacles) {
-            if (!ob.alive) continue;
-            const cx = localPlayer.x, cy = localPlayer.y, r = localPlayer.radius;
-            const nearX = Math.max(ob.x, Math.min(cx, ob.x + ob.w));
-            const nearY = Math.max(ob.y, Math.min(cy, ob.y + ob.h));
-            const ddx = cx - nearX;
-            const ddy = cy - nearY;
-            if (ddx * ddx + ddy * ddy < r * r) {
-                const ang = Math.atan2(ddy, ddx);
-                const overlap = r - Math.hypot(ddx, ddy);
-                localPlayer.x += Math.cos(ang) * overlap;
-                localPlayer.y += Math.sin(ang) * overlap;
+            let newX = localPlayer.x + moveX;
+            let newY = localPlayer.y + moveY;
+
+            newX = Math.max(localPlayer.radius, Math.min(800 - localPlayer.radius, newX));
+            newY = Math.max(localPlayer.radius, Math.min(600 - localPlayer.radius, newY));
+
+            // 障碍物碰撞
+            let blockedX = false, blockedY = false;
+            for (let ob of obstacles) {
+                if (!ob.alive) continue;
+                if (rectCircleCollide(ob, { x: newX, y: localPlayer.y, radius: localPlayer.radius })) blockedX = true;
+                if (rectCircleCollide(ob, { x: localPlayer.x, y: newY, radius: localPlayer.radius })) blockedY = true;
             }
+            if (!blockedX) localPlayer.x = newX;
+            if (!blockedY) localPlayer.y = newY;
         }
 
         // 射击冷却
         if (localPlayer.shootCooldown > 0) localPlayer.shootCooldown--;
 
-        // 射击
-        if (mousePressed && localPlayer.shootCooldown === 0 && localPlayer.alive) {
+        // 射击 (鼠标左键)
+        if (mousePressed && localPlayer.shootCooldown === 0) {
             const bullet = {
-                id: Date.now() + '_' + Math.random().toString(36).substr(2, 4),
-                ownerId: myId,
-                x: localPlayer.x + Math.cos(angle) * 20,
-                y: localPlayer.y + Math.sin(angle) * 20,
-                vx: Math.cos(angle) * 8,
-                vy: Math.sin(angle) * 8,
+                id: genId(),
+                ownerId: localId,
+                x: localPlayer.x + Math.cos(angle) * 22,
+                y: localPlayer.y + Math.sin(angle) * 22,
+                vx: Math.cos(angle) * 8.5,
+                vy: Math.sin(angle) * 8.5,
                 radius: 5,
-                life: 70,
+                life: 65,
                 damage: 1
             };
             bullets.push(bullet);
-            localPlayer.shootCooldown = 14;
-            // 广播子弹
+            localPlayer.shootCooldown = 12;
             broadcast({ type: 'bullet_spawn', bullet: bullet });
-            mousePressed = false; // 单次触发
+            mousePressed = false;
+        }
+
+        // 键盘射击
+        if (keys[k.fire] && localPlayer.shootCooldown === 0) {
+            const bullet = {
+                id: genId(),
+                ownerId: localId,
+                x: localPlayer.x + Math.cos(angle) * 22,
+                y: localPlayer.y + Math.sin(angle) * 22,
+                vx: Math.cos(angle) * 8.5,
+                vy: Math.sin(angle) * 8.5,
+                radius: 5,
+                life: 65,
+                damage: 1
+            };
+            bullets.push(bullet);
+            localPlayer.shootCooldown = 12;
+            broadcast({ type: 'bullet_spawn', bullet: bullet });
         }
 
         // 广播玩家更新
         broadcast({
             type: 'player_update',
-            id: myId,
             player: {
+                id: localId,
                 x: localPlayer.x,
                 y: localPlayer.y,
                 angle: localPlayer.angle,
@@ -531,7 +735,7 @@
         });
     }
 
-    // ----- 更新子弹 (主机) -----
+    // ----- 更新子弹 (主机负责碰撞) -----
     function updateBullets() {
         if (!isHost) return;
 
@@ -548,7 +752,8 @@
             }
 
             let used = false;
-            // 障碍物碰撞
+
+            // 障碍物
             for (let ob of obstacles) {
                 if (!ob.alive) continue;
                 if (b.x > ob.x && b.x < ob.x + ob.w && b.y > ob.y && b.y < ob.y + ob.h) {
@@ -565,13 +770,13 @@
                 continue;
             }
 
-            // 玩家碰撞
+            // 玩家
             for (let p of Object.values(players)) {
                 if (!p.alive || p.id === b.ownerId) continue;
                 const dx = p.x - b.x;
                 const dy = p.y - b.y;
                 if (dx * dx + dy * dy < (p.radius + b.radius) * (p.radius + b.radius)) {
-                    p.hp -= b.damage || 1;
+                    p.hp -= b.damage;
                     if (p.hp <= 0) {
                         p.alive = false;
                         p.hp = 0;
@@ -587,26 +792,43 @@
             }
         }
 
-        // 检查游戏结束
+        // 检查胜利
         const alive = Object.values(players).filter(p => p.alive);
         if (alive.length <= 1 && gameRunning) {
             gameRunning = false;
             winnerId = alive.length === 1 ? alive[0].id : null;
             broadcast({ type: 'game_over', winnerId: winnerId });
+            updateUI();
         }
     }
 
-    // ----- UI 更新 -----
+    function rectCircleCollide(rect, circle) {
+        const nearX = Math.max(rect.x, Math.min(circle.x, rect.x + rect.w));
+        const nearY = Math.max(rect.y, Math.min(circle.y, rect.y + rect.h));
+        const dx = circle.x - nearX;
+        const dy = circle.y - nearY;
+        return (dx * dx + dy * dy) < (circle.radius * circle.radius);
+    }
+
+    // ----- UI更新 -----
     function updateUI() {
         const count = Object.keys(players).length;
-        playerList.textContent = `👥 ${count} 人`;
-        if (winnerId !== null && players[winnerId]) {
-            document.getElementById('winnerDisplay')?.remove();
-            // 不做额外处理
+        playerCountEl.textContent = count;
+        if (!gameRunning) {
+            if (winnerId !== null && players[winnerId]) {
+                winnerSpan.textContent = players[winnerId].name;
+            } else {
+                winnerSpan.textContent = '💀 平局';
+            }
+        } else {
+            winnerSpan.textContent = '⚡ 进行中';
         }
     }
 
-    // ----- 绘图 -----
+    // ============================================================
+    //  绘图
+    // ============================================================
+
     function draw() {
         ctx.clearRect(0, 0, 800, 600);
 
@@ -705,6 +927,15 @@
             ctx.font = 'bold 12px sans-serif';
             ctx.fillText(p.name || `玩家${id}`, p.x - 20, p.y - 50);
             ctx.shadowBlur = 0;
+
+            // 标记自己
+            if (id === localId) {
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 20, 0, 2 * Math.PI);
+                ctx.stroke();
+            }
         }
 
         // 鼠标准星
@@ -712,8 +943,8 @@
             ctx.beginPath();
             ctx.arc(mouseX, mouseY, 6, 0, 2 * Math.PI);
             ctx.fillStyle = '#ffdd88';
-            ctx.shadowBlur = 20;
             ctx.shadowColor = '#ffaa33';
+            ctx.shadowBlur = 20;
             ctx.fill();
             ctx.shadowBlur = 0;
             ctx.beginPath();
@@ -745,21 +976,67 @@
         updateUI();
     }
 
-    // ----- 游戏循环 -----
+    // ============================================================
+    //  主循环
+    // ============================================================
+
     function gameLoop() {
-        if (localPlayer && localPlayer.alive) {
-            sendLocalUpdate();
+        if (isConnected && localPlayer) {
+            updateLocalPlayer();
+            if (isHost) {
+                updateBullets();
+            }
         }
-
-        if (isHost) {
-            updateBullets();
-        }
-
         draw();
         requestAnimationFrame(gameLoop);
     }
 
-    // ----- 鼠标事件 -----
+    // ============================================================
+    //  连接管理
+    // ============================================================
+
+    function disconnect() {
+        // 关闭所有连接
+        for (let id in dataChannels) {
+            try { dataChannels[id].close(); } catch (e) {}
+        }
+        for (let id in peerConnections) {
+            try { peerConnections[id].close(); } catch (e) {}
+        }
+        if (signalChannel) {
+            try { signalChannel.close(); } catch (e) {}
+            signalChannel = null;
+        }
+        dataChannels = {};
+        peerConnections = {};
+        isConnected = false;
+        isHost = false;
+        players = {};
+        bullets = [];
+        localPlayer = null;
+        localId = null;
+        statusDisplay.className = 'status offline';
+        statusDisplay.textContent = '⚪ 未连接';
+        updateUI();
+    }
+
+    // ============================================================
+    //  事件绑定
+    // ============================================================
+
+    // 按钮
+    document.getElementById('hostBtn').addEventListener('click', createHost);
+    document.getElementById('joinBtn').addEventListener('click', () => {
+        const hostId = document.getElementById('hostInput').value.trim();
+        if (hostId) {
+            joinHost(hostId);
+        } else {
+            alert('请输入主机ID');
+        }
+    });
+    document.getElementById('disconnectBtn').addEventListener('click', disconnect);
+
+    // 鼠标
     canvas.addEventListener('mousemove', (e) => {
         const rect = canvas.getBoundingClientRect();
         const scaleX = canvas.width / rect.width;
@@ -778,17 +1055,17 @@
     canvas.addEventListener('mouseup', (e) => {
         if (e.button === 0) {
             e.preventDefault();
-            // 不重置，让 sendLocalUpdate 处理
+            // 不重置，由 updateLocalPlayer 处理
         }
     });
 
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
-    // ----- 键盘 -----
+    // 键盘
     document.addEventListener('keydown', (e) => {
         const key = e.key.toLowerCase();
         keys[key] = true;
-        if (['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright',' '].includes(key) || e.key === ' ') {
+        if (['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright',' ','shift'].includes(key) || e.key === ' ') {
             e.preventDefault();
         }
     });
@@ -796,7 +1073,7 @@
     document.addEventListener('keyup', (e) => {
         const key = e.key.toLowerCase();
         keys[key] = false;
-        if (['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright',' '].includes(key) || e.key === ' ') {
+        if (['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright',' ','shift'].includes(key) || e.key === ' ') {
             e.preventDefault();
         }
     });
@@ -806,47 +1083,14 @@
         mousePressed = false;
     });
 
-    // ----- 按钮 -----
-    document.getElementById('createBtn').addEventListener('click', createRoom);
-    document.getElementById('connectBtn').addEventListener('click', () => {
-        const id = document.getElementById('peerIdInput').value.trim();
-        if (id) {
-            joinRoom(id);
-        } else {
-            alert('请输入对方的房间ID');
-        }
-    });
-
-    // 页面关闭时清理
-    window.addEventListener('beforeunload', () => {
-        if (peer) peer.destroy();
-    });
-
     // 启动
-    console.log('🎮 P2P 联机枪战已启动');
-    console.log('💡 一人点击"创建房间"，另一人输入ID后点击"连接"');
+    console.log('🎮 局域网联机枪战已启动');
+    console.log('💡 一人点击"创建房间"，其他人输入主机ID后点击"加入"');
 
-    // 添加胜者显示元素
-    const panel = document.querySelector('.panel');
-    const winnerEl = document.createElement('span');
-    winnerEl.id = 'winnerDisplay';
-    winnerEl.style.cssText = 'color:#f5d742;font-weight:bold;font-size:0.9rem;background:#102b38;padding:2px 14px;border-radius:30px;border:1px solid #2f6279;';
-    winnerEl.textContent = '🏆 -';
-    panel.appendChild(winnerEl);
-
-    // 每帧更新胜者显示
-    setInterval(() => {
-        const el = document.getElementById('winnerDisplay');
-        if (el) {
-            if (!gameRunning && winnerId !== null && players[winnerId]) {
-                el.textContent = `🏆 ${players[winnerId].name}`;
-            } else if (!gameRunning) {
-                el.textContent = '💥 平局';
-            } else {
-                el.textContent = '⚡ 进行中';
-            }
-        }
-    }, 200);
+    // 检测局域网
+    if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+        document.getElementById('hostInput').value = window.location.hostname;
+    }
 
     gameLoop();
 </script>
