@@ -225,8 +225,7 @@
 
     <script>
         // ============================================================
-        //  🌐 联机枪战 - 子弹显示最终修复版
-        //  核心：本地子弹立即显示 + 网络同步
+        //  🌐 联机枪战 - 子弹飞行修复 (所有客户端子弹移动)
         // ============================================================
 
         const canvas = document.getElementById('gameCanvas');
@@ -389,10 +388,7 @@
             }, 1000);
         }
 
-        // ============================================================
-        //  【核心】射击函数 - 本地立即显示子弹
-        // ============================================================
-
+        // ----- 射击 -----
         function shootBullet() {
             if (!localPlayer || !localPlayer.alive) return false;
             if (!gameRunning) return false;
@@ -408,12 +404,10 @@
                 vy: Math.sin(angle) * 8.5,
                 radius: 5,
                 life: 65,
-                damage: 1,
-                // 标记是否已同步
-                synced: false
+                damage: 1
             };
 
-            // 【关键】本地立即添加子弹
+            // 本地立即添加
             bullets.push(bullet);
             localPlayer.shootCooldown = 12;
 
@@ -423,16 +417,10 @@
                 bullet: bullet
             });
 
-            // 调试日志
-            console.log('🔫 射击! 子弹ID:', bullet.id, '本地子弹数:', bullets.length);
-
             return true;
         }
 
-        // ============================================================
-        //  更新逻辑
-        // ============================================================
-
+        // ----- 更新玩家 -----
         function updateLocalPlayer() {
             if (!localPlayer || !localPlayer.alive || !isConnected) return;
             if (!gameRunning) return;
@@ -471,7 +459,6 @@
 
             if (localPlayer.shootCooldown > 0) localPlayer.shootCooldown--;
 
-            // 射击检测
             const shouldShoot = mousePressed || keys[k.fire];
             if (shouldShoot && localPlayer.shootCooldown === 0) {
                 shootBullet();
@@ -491,8 +478,31 @@
             });
         }
 
-        // ----- 主机：更新子弹碰撞 -----
-        function updateBullets() {
+        // ============================================================
+        //  【核心修复】子弹移动（所有客户端执行）
+        // ============================================================
+
+        function moveAllBullets() {
+            // 所有客户端都更新子弹位置
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                const b = bullets[i];
+                b.x += b.vx;
+                b.y += b.vy;
+                b.life--;
+
+                // 边界或寿命结束 -> 移除（但主机也会移除，这里只是提前清理本地）
+                if (b.x < -20 || b.x > 820 || b.y < -20 || b.y > 620 || b.life <= 0) {
+                    // 本地移除，但主机可能还会发移除消息，为避免重复，我们直接移除
+                    bullets.splice(i, 1);
+                }
+            }
+        }
+
+        // ============================================================
+        //  【主机】碰撞检测与删除
+        // ============================================================
+
+        function hostCollisionCheck() {
             if (!isHost) return;
             if (!gameRunning) return;
 
@@ -500,12 +510,9 @@
 
             for (let i = 0; i < bullets.length; i++) {
                 const b = bullets[i];
-                b.x += b.vx;
-                b.y += b.vy;
-                b.life--;
 
-                // 边界/寿命检查
-                if (b.x < 0 || b.x > 800 || b.y < 0 || b.y > 600 || b.life <= 0) {
+                // 边界检查（已经在 moveAllBullets 中处理了边界移除，但为了安全再检查一次）
+                if (b.x < -20 || b.x > 820 || b.y < -20 || b.y > 620 || b.life <= 0) {
                     toRemove.push(b.id);
                     continue;
                 }
@@ -602,13 +609,20 @@
                     break;
 
                 case 'bullet_spawn':
-                    // 【关键】收到子弹立即添加到本地
-                    bullets.push(data.bullet);
-                    // 调试日志
-                    console.log('📨 收到子弹:', data.bullet.id, '来自:', data.bullet.ownerId);
-
+                    // 避免重复添加自己的子弹（因为本地已经添加了）
+                    if (data.bullet.ownerId === myId) {
+                        // 但可能因为网络延迟，本地已有，忽略
+                        // 但为了安全，检查是否已存在
+                        const exist = bullets.some(b => b.id === data.bullet.id);
+                        if (!exist) {
+                            bullets.push(data.bullet);
+                        }
+                    } else {
+                        // 其他人的子弹，添加
+                        bullets.push(data.bullet);
+                    }
                     // 如果是主机，转发给客户端（但不要转发回发送者）
-                    if (isHost) {
+                    if (isHost && data.bullet.ownerId !== myId) {
                         // 转发给连接的客户端
                         const msg = JSON.stringify({
                             type: 'bullet_spawn',
@@ -682,18 +696,18 @@
                         sendData({
                             type: 'full_state',
                             players: players,
-                            bullets: bullets,
                             obstacles: obstacles,
                             gameRunning: gameRunning,
                             winnerId: winnerId
+                            // 不同步 bullets，因为子弹会实时同步
                         });
                     }
                     break;
 
                 case 'full_state':
                     if (!isHost) {
+                        // 只更新玩家和障碍物，不覆盖子弹
                         players = data.players || {};
-                        bullets = data.bullets || [];
                         obstacles = data.obstacles || [];
                         gameRunning = data.gameRunning !== undefined ? data.gameRunning : true;
                         winnerId = data.winnerId || null;
@@ -914,7 +928,7 @@
                 }
             }
 
-            // 【核心】绘制子弹 - 所有子弹都显示
+            // 子弹
             for (let b of bullets) {
                 ctx.beginPath();
                 ctx.arc(b.x, b.y, b.radius || 5, 0, 2 * Math.PI);
@@ -1031,12 +1045,19 @@
         // ============================================================
 
         function gameLoop() {
+            // 所有客户端移动子弹
+            moveAllBullets();
+
+            // 更新本地玩家
             if (isConnected && localPlayer) {
                 updateLocalPlayer();
-                if (isHost) {
-                    updateBullets();
-                }
             }
+
+            // 主机碰撞检测
+            if (isHost) {
+                hostCollisionCheck();
+            }
+
             draw();
             requestAnimationFrame(gameLoop);
         }
@@ -1125,8 +1146,7 @@
         });
 
         console.log('🎮 联机枪战');
-        console.log('📋 核心修复: 本地射击后子弹立即显示在画布上');
-        console.log('💡 按空格或鼠标左键射击，子弹会立即飞出');
+        console.log('💡 所有客户端子弹都会飞了！');
 
         gameLoop();
     </script>
