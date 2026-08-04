@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🔫 联机枪战 · 自动重开修复</title>
+    <title>🔫 联机枪战 · 子弹同步修复</title>
     <script src="https://unpkg.com/peerjs@1.5.1/dist/peerjs.min.js">
     </script>
     <style>
@@ -102,10 +102,6 @@
         .btn-danger:hover {
             background: #d85e4c;
         }
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
         .input-group {
             display: flex;
             gap: 6px;
@@ -180,6 +176,10 @@
             border-radius: 30px;
             border: 1px solid #ff6b6b;
         }
+        .bullet-counter {
+            color: #ffdd77;
+            font-size: 0.7rem;
+        }
         @media (max-width:600px) {
             .panel {
                 flex-direction: column;
@@ -209,6 +209,7 @@
             <div class="stats">
                 <span>🏆 <strong id="winnerDisplay">-</strong></span>
                 <span>👥 <strong id="playerCount">0</strong></span>
+                <span class="bullet-counter">💥 <strong id="bulletCount">0</strong></span>
             </div>
         </div>
         <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px; margin-top:6px;">
@@ -224,8 +225,8 @@
 
     <script>
         // ============================================================
-        //  🌐 联机枪战 - 自动重开修复版
-        //  修复: 重置逻辑完全重写
+        //  🌐 联机枪战 - 子弹同步修复版
+        //  修复：主机转发子弹给所有客户端
         // ============================================================
 
         const canvas = document.getElementById('gameCanvas');
@@ -233,6 +234,7 @@
         const statusDisplay = document.getElementById('statusDisplay');
         const winnerSpan = document.getElementById('winnerDisplay');
         const playerCountEl = document.getElementById('playerCount');
+        const bulletCountEl = document.getElementById('bulletCount');
         const roomIdDisplay = document.getElementById('roomIdDisplay');
         const countdownDisplay = document.getElementById('countdownDisplay');
 
@@ -337,7 +339,6 @@
 
         function resetGame() {
             console.log('🔄 重置游戏...');
-            // 重置所有玩家
             const playerList = Object.values(players);
             for (let i = 0; i < playerList.length; i++) {
                 const p = playerList[i];
@@ -358,7 +359,6 @@
             countdownDisplay.textContent = '⚔️ 战斗中！';
             countdownDisplay.style.color = '#6fcf97';
 
-            // 广播重置
             sendData({
                 type: 'game_reset',
                 players: players,
@@ -387,15 +387,6 @@
                     resetGame();
                 }
             }, 1000);
-        }
-
-        // 强制重置（外部调用）
-        function forceReset() {
-            if (resetTimer) {
-                clearInterval(resetTimer);
-                resetTimer = null;
-            }
-            resetGame();
         }
 
         function updateLocalPlayer() {
@@ -452,9 +443,17 @@
                     life: 65,
                     damage: 1
                 };
+                // 本地立即添加
                 bullets.push(bullet);
                 localPlayer.shootCooldown = 12;
-                sendData({ type: 'bullet_spawn', bullet: bullet });
+
+                // 【关键修复】发送子弹给主机，主机负责转发
+                sendData({
+                    type: 'bullet_spawn',
+                    bullet: bullet,
+                    // 标记这是需要转发给所有人的
+                    forward: true
+                });
                 mousePressed = false;
             }
 
@@ -471,6 +470,7 @@
             });
         }
 
+        // ----- 主机：处理子弹碰撞 + 转发 -----
         function updateBullets() {
             if (!isHost) return;
             if (!gameRunning) return;
@@ -488,6 +488,7 @@
                 }
 
                 let used = false;
+                // 障碍物碰撞
                 for (let ob of obstacles) {
                     if (!ob.alive) continue;
                     if (b.x > ob.x && b.x < ob.x + ob.w && b.y > ob.y && b.y < ob.y + ob.h) {
@@ -504,6 +505,7 @@
                     continue;
                 }
 
+                // 玩家碰撞
                 for (let p of Object.values(players)) {
                     if (!p.alive || p.id === b.ownerId) continue;
                     const dx = p.x - b.x;
@@ -532,15 +534,12 @@
                 winnerId = alive.length === 1 ? alive[0].id : null;
                 sendData({ type: 'game_over', winnerId: winnerId });
                 updateUI();
-
-                // 启动3秒倒计时重置
-                console.log('🏆 游戏结束，启动倒计时');
                 startResetCountdown();
             }
         }
 
         // ============================================================
-        //  网络通信 (PeerJS)
+        //  网络通信 (PeerJS) - 核心修复
         // ============================================================
 
         function sendData(data) {
@@ -550,6 +549,9 @@
         }
 
         function handlePeerMessage(data) {
+            // 调试日志
+            // console.log('📨 收到消息:', data.type, 'from:', data.sender || 'unknown');
+
             switch (data.type) {
                 case 'player_info':
                     if (data.player && data.player.id !== myId) {
@@ -566,36 +568,67 @@
                         updateUI();
                     }
                     break;
+
                 case 'player_update':
                     if (data.player && data.player.id !== myId && players[data.player.id]) {
                         Object.assign(players[data.player.id], data.player);
                         updateUI();
                     }
                     break;
+
                 case 'bullet_spawn':
+                    // 【关键修复1】收到子弹立即添加到本地显示
                     bullets.push(data.bullet);
+
+                    // 【关键修复2】如果是主机，转发给所有其他客户端
+                    if (isHost && data.forward) {
+                        // 转发给所有客户端（除了发送者）
+                        // 但这里我们通过 PeerJS 的广播机制，直接转发
+                        // 注意：不要转发回发送者
+                        const msg = JSON.stringify({
+                            type: 'bullet_spawn',
+                            bullet: data.bullet,
+                            forward: false // 防止无限循环
+                        });
+                        if (conn && conn.open) {
+                            // 发送给连接的客户端
+                            conn.send(msg);
+                        }
+                        console.log('🔄 主机转发子弹:', data.bullet.id);
+                    }
                     break;
+
                 case 'bullet_remove':
                     bullets = bullets.filter(b => b.id !== data.bulletId);
+                    // 主机也要转发移除消息
+                    if (isHost) {
+                        const msg = JSON.stringify({
+                            type: 'bullet_remove',
+                            bulletId: data.bulletId
+                        });
+                        if (conn && conn.open) {
+                            conn.send(msg);
+                        }
+                    }
                     break;
+
                 case 'player_hit':
                     if (players[data.targetId]) {
                         players[data.targetId].hp = data.hp;
                         if (data.hp <= 0) players[data.targetId].alive = false;
                     }
                     break;
+
                 case 'game_over':
                     gameRunning = false;
                     winnerId = data.winnerId;
                     updateUI();
-                    // 非主机也启动倒计时
                     if (!isHost && !gameEnded) {
-                        console.log('🏆 收到 game_over，启动倒计时');
                         startResetCountdown();
                     }
                     break;
+
                 case 'game_reset':
-                    // 收到重置指令
                     console.log('🔄 收到重置指令');
                     players = data.players || {};
                     obstacles = data.obstacles || [];
@@ -611,6 +644,7 @@
                     }
                     updateUI();
                     break;
+
                 case 'obstacle_damage':
                     for (let ob of obstacles) {
                         if (ob.id === data.obstacleId) {
@@ -620,6 +654,7 @@
                         }
                     }
                     break;
+
                 case 'sync_request':
                     if (isHost) {
                         sendData({
@@ -632,6 +667,7 @@
                         });
                     }
                     break;
+
                 case 'full_state':
                     if (!isHost) {
                         players = data.players || {};
@@ -822,6 +858,8 @@
         function updateUI() {
             const count = Object.keys(players).length;
             playerCountEl.textContent = count;
+            bulletCountEl.textContent = bullets.length;
+
             if (!gameRunning && gameEnded) {
                 if (winnerId !== null && players[winnerId]) {
                     winnerSpan.textContent = '🏆 ' + players[winnerId].name;
@@ -1056,9 +1094,6 @@
             }
         });
 
-        // 暴露手动重置（调试用）
-        window.forceReset = forceReset;
-
         canvas.addEventListener('mousemove', (e) => {
             const rect = canvas.getBoundingClientRect();
             const scaleX = canvas.width / rect.width;
@@ -1101,11 +1136,11 @@
             mousePressed = false;
         });
 
-        console.log('🎮 联机枪战已启动 (自动重开修复)');
-        console.log('📋 使用说明:');
-        console.log('1. 一人点击"创建房间"，获得4位房间号');
-        console.log('2. 其他人输入房间号，点击"加入房间"');
-        console.log('3. 胜利后3秒自动重置！');
+        console.log('🎮 联机枪战 - 子弹同步修复版');
+        console.log('📋 修复内容:');
+        console.log('  1. 主机收到子弹后转发给所有客户端');
+        console.log('  2. 客户端收到子弹立即显示');
+        console.log('  3. 子弹移除消息也同步转发');
 
         gameLoop();
     </script>
