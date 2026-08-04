@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🔫 联机枪战 · 子弹同步修复</title>
+    <title>🔫 联机枪战</title>
     <script src="https://unpkg.com/peerjs@1.5.1/dist/peerjs.min.js">
     </script>
     <style>
@@ -225,8 +225,8 @@
 
     <script>
         // ============================================================
-        //  🌐 联机枪战 - 子弹同步修复版
-        //  修复：主机转发子弹给所有客户端
+        //  🌐 联机枪战 - 子弹显示最终修复版
+        //  核心：本地子弹立即显示 + 网络同步
         // ============================================================
 
         const canvas = document.getElementById('gameCanvas');
@@ -276,7 +276,7 @@
 
         // ----- 工具函数 -----
         function genId() {
-            return 'p' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+            return 'b' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
         }
 
         function createObstacles() {
@@ -389,6 +389,50 @@
             }, 1000);
         }
 
+        // ============================================================
+        //  【核心】射击函数 - 本地立即显示子弹
+        // ============================================================
+
+        function shootBullet() {
+            if (!localPlayer || !localPlayer.alive) return false;
+            if (!gameRunning) return false;
+            if (localPlayer.shootCooldown > 0) return false;
+
+            const angle = localPlayer.angle;
+            const bullet = {
+                id: genId(),
+                ownerId: myId,
+                x: localPlayer.x + Math.cos(angle) * 22,
+                y: localPlayer.y + Math.sin(angle) * 22,
+                vx: Math.cos(angle) * 8.5,
+                vy: Math.sin(angle) * 8.5,
+                radius: 5,
+                life: 65,
+                damage: 1,
+                // 标记是否已同步
+                synced: false
+            };
+
+            // 【关键】本地立即添加子弹
+            bullets.push(bullet);
+            localPlayer.shootCooldown = 12;
+
+            // 发送给主机同步
+            sendData({
+                type: 'bullet_spawn',
+                bullet: bullet
+            });
+
+            // 调试日志
+            console.log('🔫 射击! 子弹ID:', bullet.id, '本地子弹数:', bullets.length);
+
+            return true;
+        }
+
+        // ============================================================
+        //  更新逻辑
+        // ============================================================
+
         function updateLocalPlayer() {
             if (!localPlayer || !localPlayer.alive || !isConnected) return;
             if (!gameRunning) return;
@@ -418,10 +462,8 @@
                     blockedY = false;
                 for (let ob of obstacles) {
                     if (!ob.alive) continue;
-                    if (rectCircleCollide(ob, { x: newX, y: localPlayer.y, radius: localPlayer.radius })) blockedX =
-                    true;
-                    if (rectCircleCollide(ob, { x: localPlayer.x, y: newY, radius: localPlayer.radius })) blockedY =
-                    true;
+                    if (rectCircleCollide(ob, { x: newX, y: localPlayer.y, radius: localPlayer.radius })) blockedX = true;
+                    if (rectCircleCollide(ob, { x: localPlayer.x, y: newY, radius: localPlayer.radius })) blockedY = true;
                 }
                 if (!blockedX) localPlayer.x = newX;
                 if (!blockedY) localPlayer.y = newY;
@@ -429,31 +471,10 @@
 
             if (localPlayer.shootCooldown > 0) localPlayer.shootCooldown--;
 
+            // 射击检测
             const shouldShoot = mousePressed || keys[k.fire];
-            if (shouldShoot && localPlayer.shootCooldown === 0 && gameRunning) {
-                const angle2 = localPlayer.angle;
-                const bullet = {
-                    id: genId(),
-                    ownerId: myId,
-                    x: localPlayer.x + Math.cos(angle2) * 22,
-                    y: localPlayer.y + Math.sin(angle2) * 22,
-                    vx: Math.cos(angle2) * 8.5,
-                    vy: Math.sin(angle2) * 8.5,
-                    radius: 5,
-                    life: 65,
-                    damage: 1
-                };
-                // 本地立即添加
-                bullets.push(bullet);
-                localPlayer.shootCooldown = 12;
-
-                // 【关键修复】发送子弹给主机，主机负责转发
-                sendData({
-                    type: 'bullet_spawn',
-                    bullet: bullet,
-                    // 标记这是需要转发给所有人的
-                    forward: true
-                });
+            if (shouldShoot && localPlayer.shootCooldown === 0) {
+                shootBullet();
                 mousePressed = false;
             }
 
@@ -470,24 +491,27 @@
             });
         }
 
-        // ----- 主机：处理子弹碰撞 + 转发 -----
+        // ----- 主机：更新子弹碰撞 -----
         function updateBullets() {
             if (!isHost) return;
             if (!gameRunning) return;
 
-            for (let i = bullets.length - 1; i >= 0; i--) {
+            const toRemove = [];
+
+            for (let i = 0; i < bullets.length; i++) {
                 const b = bullets[i];
                 b.x += b.vx;
                 b.y += b.vy;
                 b.life--;
 
+                // 边界/寿命检查
                 if (b.x < 0 || b.x > 800 || b.y < 0 || b.y > 600 || b.life <= 0) {
-                    bullets.splice(i, 1);
-                    sendData({ type: 'bullet_remove', bulletId: b.id });
+                    toRemove.push(b.id);
                     continue;
                 }
 
                 let used = false;
+
                 // 障碍物碰撞
                 for (let ob of obstacles) {
                     if (!ob.alive) continue;
@@ -500,8 +524,7 @@
                     }
                 }
                 if (used) {
-                    bullets.splice(i, 1);
-                    sendData({ type: 'bullet_remove', bulletId: b.id });
+                    toRemove.push(b.id);
                     continue;
                 }
 
@@ -522,9 +545,14 @@
                     }
                 }
                 if (used) {
-                    bullets.splice(i, 1);
-                    sendData({ type: 'bullet_remove', bulletId: b.id });
+                    toRemove.push(b.id);
                 }
+            }
+
+            // 移除子弹并广播
+            for (let id of toRemove) {
+                bullets = bullets.filter(b => b.id !== id);
+                sendData({ type: 'bullet_remove', bulletId: id });
             }
 
             // 检查胜利
@@ -539,7 +567,7 @@
         }
 
         // ============================================================
-        //  网络通信 (PeerJS) - 核心修复
+        //  网络通信
         // ============================================================
 
         function sendData(data) {
@@ -549,9 +577,6 @@
         }
 
         function handlePeerMessage(data) {
-            // 调试日志
-            // console.log('📨 收到消息:', data.type, 'from:', data.sender || 'unknown');
-
             switch (data.type) {
                 case 'player_info':
                     if (data.player && data.player.id !== myId) {
@@ -577,30 +602,27 @@
                     break;
 
                 case 'bullet_spawn':
-                    // 【关键修复1】收到子弹立即添加到本地显示
+                    // 【关键】收到子弹立即添加到本地
                     bullets.push(data.bullet);
+                    // 调试日志
+                    console.log('📨 收到子弹:', data.bullet.id, '来自:', data.bullet.ownerId);
 
-                    // 【关键修复2】如果是主机，转发给所有其他客户端
-                    if (isHost && data.forward) {
-                        // 转发给所有客户端（除了发送者）
-                        // 但这里我们通过 PeerJS 的广播机制，直接转发
-                        // 注意：不要转发回发送者
+                    // 如果是主机，转发给客户端（但不要转发回发送者）
+                    if (isHost) {
+                        // 转发给连接的客户端
                         const msg = JSON.stringify({
                             type: 'bullet_spawn',
-                            bullet: data.bullet,
-                            forward: false // 防止无限循环
+                            bullet: data.bullet
                         });
                         if (conn && conn.open) {
-                            // 发送给连接的客户端
                             conn.send(msg);
                         }
-                        console.log('🔄 主机转发子弹:', data.bullet.id);
                     }
                     break;
 
                 case 'bullet_remove':
                     bullets = bullets.filter(b => b.id !== data.bulletId);
-                    // 主机也要转发移除消息
+                    // 主机转发移除消息
                     if (isHost) {
                         const msg = JSON.stringify({
                             type: 'bullet_remove',
@@ -685,7 +707,7 @@
         }
 
         // ============================================================
-        //  创建房间 (主机)
+        //  创建/加入房间
         // ============================================================
 
         function createRoom() {
@@ -695,9 +717,7 @@
             document.getElementById('roomInput').value = roomId;
             roomIdDisplay.textContent = '📋 房间号: ' + roomId;
 
-            peer = new Peer(roomId, {
-                debug: 0
-            });
+            peer = new Peer(roomId, { debug: 0 });
 
             peer.on('open', (id) => {
                 console.log('✅ 房间创建成功，ID:', id);
@@ -705,11 +725,11 @@
                 isHost = true;
                 isConnected = true;
                 statusDisplay.className = 'status waiting';
-                statusDisplay.textContent = '🟡 等待加入... (房间 ' + roomId + ')';
+                statusDisplay.textContent = '🟡 等待加入...';
                 countdownDisplay.textContent = '⏳ 等待玩家...';
                 countdownDisplay.style.color = '#8bc9e6';
                 updateUI();
-                alert('✅ 房间创建成功！\n房间号: ' + roomId + '\n让其他人输入这个房间号加入');
+                alert('✅ 房间创建成功！\n房间号: ' + roomId);
             });
 
             peer.on('connection', (incoming) => {
@@ -738,9 +758,7 @@
                 });
 
                 conn.on('data', (data) => {
-                    try {
-                        handlePeerMessage(JSON.parse(data));
-                    } catch (e) { console.warn(e); }
+                    try { handlePeerMessage(JSON.parse(data)); } catch (e) { console.warn(e); }
                 });
 
                 conn.on('close', () => {
@@ -748,10 +766,8 @@
                     statusDisplay.className = 'status offline';
                     statusDisplay.textContent = '🔴 连接断开';
                     isConnected = false;
-                    if (resetTimer) {
-                        clearInterval(resetTimer);
-                        resetTimer = null;
-                    }
+                    if (resetTimer) { clearInterval(resetTimer);
+                        resetTimer = null; }
                 });
             });
 
@@ -767,24 +783,15 @@
             });
         }
 
-        // ============================================================
-        //  加入房间 (客户端)
-        // ============================================================
-
         function joinRoom(roomIdToJoin) {
             if (isConnected) disconnect();
 
             roomId = roomIdToJoin.trim();
-            if (!roomId) {
-                alert('请输入房间号');
-                return;
-            }
+            if (!roomId) { alert('请输入房间号'); return; }
 
             roomIdDisplay.textContent = '📋 加入房间: ' + roomId;
 
-            peer = new Peer({
-                debug: 0
-            });
+            peer = new Peer({ debug: 0 });
 
             peer.on('open', (id) => {
                 console.log('✅ 本地ID:', id);
@@ -821,9 +828,7 @@
                 });
 
                 conn.on('data', (data) => {
-                    try {
-                        handlePeerMessage(JSON.parse(data));
-                    } catch (e) { console.warn(e); }
+                    try { handlePeerMessage(JSON.parse(data)); } catch (e) { console.warn(e); }
                 });
 
                 conn.on('close', () => {
@@ -831,10 +836,8 @@
                     statusDisplay.className = 'status offline';
                     statusDisplay.textContent = '🔴 连接断开';
                     isConnected = false;
-                    if (resetTimer) {
-                        clearInterval(resetTimer);
-                        resetTimer = null;
-                    }
+                    if (resetTimer) { clearInterval(resetTimer);
+                        resetTimer = null; }
                 });
             });
 
@@ -874,7 +877,7 @@
         function draw() {
             ctx.clearRect(0, 0, 800, 600);
 
-            // 背景
+            // 背景网格
             ctx.strokeStyle = '#2a4a5a';
             ctx.lineWidth = 1;
             for (let i = 0; i < 800; i += 40) {
@@ -911,7 +914,7 @@
                 }
             }
 
-            // 子弹
+            // 【核心】绘制子弹 - 所有子弹都显示
             for (let b of bullets) {
                 ctx.beginPath();
                 ctx.arc(b.x, b.y, b.radius || 5, 0, 2 * Math.PI);
@@ -1000,6 +1003,7 @@
                 ctx.stroke();
             }
 
+            // 游戏结束覆盖层
             if (!gameRunning && gameEnded) {
                 ctx.fillStyle = 'rgba(0,0,0,0.4)';
                 ctx.fillRect(0, 0, 800, 600);
@@ -1014,8 +1018,6 @@
                 }
                 if (resetCountdown > 0) {
                     msg += `  ⏳ ${resetCountdown}s`;
-                } else {
-                    msg += '  🔄 准备中...';
                 }
                 ctx.fillText(msg, 150, 320);
                 ctx.shadowBlur = 0;
@@ -1044,18 +1046,12 @@
         // ============================================================
 
         function disconnect() {
-            if (resetTimer) {
-                clearInterval(resetTimer);
-                resetTimer = null;
-            }
-            if (conn) {
-                try { conn.close(); } catch (e) {}
-                conn = null;
-            }
-            if (peer) {
-                try { peer.destroy(); } catch (e) {}
-                peer = null;
-            }
+            if (resetTimer) { clearInterval(resetTimer);
+                resetTimer = null; }
+            if (conn) { try { conn.close(); } catch (e) {} }
+            if (peer) { try { peer.destroy(); } catch (e) {} }
+            conn = null;
+            peer = null;
             isConnected = false;
             isHost = false;
             players = {};
@@ -1080,18 +1076,12 @@
         document.getElementById('hostBtn').addEventListener('click', createRoom);
         document.getElementById('joinBtn').addEventListener('click', () => {
             const id = document.getElementById('roomInput').value.trim();
-            if (id) {
-                joinRoom(id);
-            } else {
-                alert('请输入房间号');
-            }
+            if (id) { joinRoom(id); } else { alert('请输入房间号'); }
         });
         document.getElementById('disconnectBtn').addEventListener('click', disconnect);
 
         document.getElementById('roomInput').addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                document.getElementById('joinBtn').click();
-            }
+            if (e.key === 'Enter') { document.getElementById('joinBtn').click(); }
         });
 
         canvas.addEventListener('mousemove', (e) => {
@@ -1103,10 +1093,8 @@
         });
 
         canvas.addEventListener('mousedown', (e) => {
-            if (e.button === 0) {
-                e.preventDefault();
-                mousePressed = true;
-            }
+            if (e.button === 0) { e.preventDefault();
+                mousePressed = true; }
         });
 
         canvas.addEventListener('mouseup', (e) => {
@@ -1136,11 +1124,9 @@
             mousePressed = false;
         });
 
-        console.log('🎮 联机枪战 - 子弹同步修复版');
-        console.log('📋 修复内容:');
-        console.log('  1. 主机收到子弹后转发给所有客户端');
-        console.log('  2. 客户端收到子弹立即显示');
-        console.log('  3. 子弹移除消息也同步转发');
+        console.log('🎮 联机枪战');
+        console.log('📋 核心修复: 本地射击后子弹立即显示在画布上');
+        console.log('💡 按空格或鼠标左键射击，子弹会立即飞出');
 
         gameLoop();
     </script>
